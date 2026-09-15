@@ -101,10 +101,8 @@ public class MainActivity extends Activity {
             // Go 运行时启动失败时继续，由重试逻辑兜底
         }
 
-        // 节点代理（下载配置开关）：开启过则恢复启动内置 dnode 节点，否则保持直连
-        if (getSharedPreferences("ndp", MODE_PRIVATE).getBoolean("node_proxy", false)) {
-            DnodeBridge.start(this);
-        }
+        // 节点代理：默认常启内置 dnode 节点（123 网盘下载走节点加速）
+        DnodeBridge.start(this);
 
         webView = new WebView(this);
         WebSettings s = webView.getSettings();

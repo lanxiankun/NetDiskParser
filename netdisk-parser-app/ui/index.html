@@ -647,7 +647,6 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <span id="nodeProxyStatus" style="font-size:12px;color:#8a94a6;max-width:150px;text-align:right;white-space:pre-line"></span>
-            <div class="switch" id="nodeProxyToggle" role="switch" aria-checked="false"><span class="knob"></span></div>
           </div>
         </div>
         <p class="set-note">下载引擎已内置在本程序中，随 App 启动运行，无需单独安装。下载目录填写本机绝对路径，保存后立即生效。</p>
@@ -2105,24 +2104,10 @@ async function fillSettingsForm(){
   $("#setApiKey").value = settings.apiKey || "";
   $("#setThreads").value = settings.threads || 16;
   $("#setMaxRunning").value = settings.maxRunning || 5;
-  // 节点代理开关（Android 专属：经 Java bridge 启停内置 dnode 节点；桌面无 bridge 则隐藏）
+  // 节点代理状态（Android 专属：节点默认常启，仅显示实时状态；桌面无 bridge 则隐藏）
   const npRow = $("#nodeProxyRow");
   if(npRow){
     if(window.AndroidBridge){
-      let npOn = false;
-      try{ npOn = AndroidBridge.getNodeProxy() === true; }catch(e){}
-      const sw = $("#nodeProxyToggle");
-      sw.classList.toggle("on", npOn);
-      sw.setAttribute("aria-checked", npOn ? "true" : "false");
-      sw.addEventListener("click", () => {
-        const next = !sw.classList.contains("on");
-        sw.classList.toggle("on", next);
-        sw.setAttribute("aria-checked", next ? "true" : "false");
-        try{
-          AndroidBridge.setNodeProxy(next);
-          toast(next ? "节点代理已开启（123 下载走节点）" : "节点代理已关闭（恢复直连）", "ok");
-        }catch(e){ toast("节点切换失败: " + e, "err"); }
-      });
       // 节点实时状态（/app/node-status 读 dnode_status.json）
       async function refreshNodeStatus(){
         try{
