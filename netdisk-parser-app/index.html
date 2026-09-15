@@ -175,26 +175,35 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 .view-switch button{width:28px;height:25px;border:1px solid var(--border-soft);background:var(--surface-2);color:var(--text-2);border-radius:6px;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:all .15s}
 .view-switch button:hover{color:var(--text)}
 .view-switch button.active{color:#fff;background:var(--accent);border-color:var(--accent)}
-/* 图标视图（并排卡片） */
-.tree.tree-grid, .tree-children.tree-grid{display:flex;flex-wrap:wrap;gap:9px;padding:2px 0}
+/* 图标视图（文件管理器大卡片：图标+名称+大小+时间） */
+.tree.tree-grid, .tree-children.tree-grid{display:flex;flex-wrap:wrap;gap:10px;padding:2px 0}
 .tree-children.tree-grid{margin-left:18px;padding-left:10px}
-.tree-grid .tree-item{width:calc(33.333% - 6px);min-width:78px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:12px 5px;position:relative;cursor:pointer}
-.tree-grid .tree-item .t-icon{width:40px;height:40px;border-radius:10px;flex:none}
-.tree-grid .tree-item .t-icon svg{width:22px;height:22px}
+.tree-grid .tree-item{width:calc(50% - 5px);min-width:92px;flex-direction:column;align-items:stretch;text-align:left;gap:6px;padding:12px;position:relative;cursor:pointer}
+@media (min-width:520px){ .tree-grid .tree-item{width:calc(33.333% - 7px)} }
+@media (min-width:720px){ .tree-grid .tree-item{width:calc(25% - 8px)} }
+.tree-grid .tree-item .t-icon{width:46px;height:46px;border-radius:11px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:25px;height:25px}
 .tree-grid .tree-item .t-main{width:100%;min-width:0}
-.tree-grid .tree-item .t-name{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
-.tree-grid .tree-item .t-sub{font-size:10.5px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-name{font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;font-weight:550}
+.tree-grid .tree-item .t-size{font-size:11px;color:var(--text-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-time{font-size:10.5px;color:var(--text-3);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tree-grid .tree-item .t-check{display:none}
-.tree-grid .tree-item .t-dl{display:none;position:absolute;right:5px;top:5px;padding:3px 6px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:6px;top:6px;padding:3px 7px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
 .tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
 .tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
 .tree-grid .tree-item.folder .t-name{color:var(--warn)}
+.tree-grid .tree-item.folder .t-icon svg{stroke:var(--warn)}
 /* 详情视图 */
 .tree-detail .tree-item{padding:12px 14px}
 .tree-detail .tree-item .t-name{font-size:14px}
 .tree-detail .tree-item .t-sub{font-size:12px;margin-top:3px}
-/* 网格子层缩进对齐 */
-.tree-grid > .tree-item{width:calc(33.333% - 6px)}
+/* 树浏览视图（面包屑 + 当前目录内容） */
+.tree.tree-nav{display:flex;flex-direction:column;gap:8px}
+.nav-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5}
+.nav-crumb{color:var(--sky);cursor:pointer;padding:1px 4px;border-radius:5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-crumb.cur{color:var(--text);font-weight:650;cursor:default}
+.nav-sep{color:var(--text-3)}
+.nav-content{display:flex;flex-direction:column;gap:6px}
 
 /* ===== 表单（设置） ===== */
 .set-group{margin-bottom:16px}
@@ -1605,7 +1614,7 @@ async function renderTree(items, container){
     <span class="view-switch">
       <button data-view="list" class="${viewMode === "list" ? "active" : ""}" title="列表视图">☰</button>
       <button data-view="grid" class="${viewMode === "grid" ? "active" : ""}" title="图标视图">▦</button>
-      <button data-view="detail" class="${viewMode === "detail" ? "active" : ""}" title="详情视图">≣</button>
+      <button data-view="tree" class="${viewMode === "tree" ? "active" : ""}" title="树浏览视图">⊞</button>
     </span>`;
   card.appendChild(head);
   const vs = head.querySelector(".view-switch");
@@ -1621,7 +1630,13 @@ async function renderTree(items, container){
   list.className = "tree";
   list.id = "treeList";
   card.appendChild(list);
-  renderTreeItems(items, list);
+  if(viewMode === "tree"){
+    // 树浏览视图：面包屑导航 + 当前目录内容
+    currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
+    renderNavView();
+  }else{
+    renderTreeItems(items, list);
+  }
   renderTreeSummary();
 }
 
@@ -1632,7 +1647,8 @@ function renderTreeItems(items, list){
   const seenIds = new Set();
   const seenFolderNames = new Set();
   const gridMode = viewMode === "grid";
-  const detailMode = viewMode === "detail";
+  const detailMode = viewMode === "detail" || viewMode === "tree";
+  const navMode = viewMode === "tree";
   for(const item of items){
     const idKey = item.fileId || item.parserUrl;
     const isFolder = (item.fileType || "").toLowerCase() === "folder";
@@ -1653,12 +1669,14 @@ function renderTreeItems(items, list){
     const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
     const iconHtml = `<div class="t-icon">${isFolder ? ICONS.folder : fileTypeIcon(item.fileType)}</div>`;
     if(gridMode){
-      // 并排图标视图：图标卡片
+      // 图标视图：大卡片（图标 + 名称 + 大小 + 时间），文件管理器风格
+      const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
       node.innerHTML = `
         ${iconHtml}
         <div class="t-main">
           <div class="t-name">${escapeHtml(item.fileName)}</div>
-          <div class="t-sub">${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}</div>
+          <div class="t-size">${item.sizeStr ? escapeHtml(item.sizeStr) : tagText}</div>
+          ${tm ? `<div class="t-time">${escapeHtml(tm)}</div>` : ""}
         </div>
         <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`;
     }else if(detailMode){
@@ -1688,7 +1706,8 @@ function renderTreeItems(items, list){
     node.addEventListener("click", (e) => {
       if(e.target.closest(".t-dl")) return;
       if(isFolder){
-        toggleFolder(node, item);
+        if(navMode) enterNavDir(item);
+        else toggleFolder(node, item);
       }else{
         toggleSelect(idKey, item);
       }
@@ -1702,7 +1721,7 @@ function renderTreeItems(items, list){
   }
 }
 
-// ========== 视图切换：更新模式 + 重建树（保留展开状态，缓存命中秒开） ==========
+// ========== 视图切换：更新模式 + 重渲染内容（不重建卡片，保留展开状态） ==========
 function setViewMode(mode){
   if(viewMode === mode) return;
   viewMode = mode;
@@ -1713,12 +1732,67 @@ function setViewMode(mode){
 function rebuildTree(){
   const treeList = $("#treeList");
   if(!treeList) return;
+  if(viewMode === "tree"){
+    // 树浏览视图：从根目录开始导航
+    currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
+    renderNavView();
+    return;
+  }
+  // 平铺视图：只重渲染列表内容（保留展开状态，缓存命中秒开）
   const openKeys = new Set();
   treeList.querySelectorAll(".tree-item.open").forEach(n => { if(n.dataset.key) openKeys.add(n.dataset.key); });
-  const parent = treeList.parentElement;
-  renderTree(currentTree.items, parent); // 重建整棵树（标题/视图按钮/summary/列表）
-  const newList = $("#treeList");
-  if(newList) expandAfterRebuild(newList, openKeys);
+  treeList.innerHTML = "";
+  renderTreeItems(currentTree.items, treeList);
+  renderTreeSummary();
+  expandAfterRebuild(treeList, openKeys);
+}
+
+// ========== 树浏览视图（图2 风格：面包屑 + 当前目录内容） ==========
+function renderNavView(){
+  const list = $("#treeList");
+  if(!list) return;
+  list.innerHTML = "";
+  list.classList.remove("tree-list", "tree-grid", "tree-detail");
+  list.classList.add("tree-nav");
+  const bc = document.createElement("div");
+  bc.className = "nav-breadcrumb";
+  bc.innerHTML = currentTree.navPath.map((p, i) =>
+    `<span class="nav-crumb${i === currentTree.navPath.length - 1 ? " cur" : ""}" data-i="${i}">${escapeHtml(p.name)}</span>`
+  ).join(`<span class="nav-sep">/</span>`);
+  bc.addEventListener("click", (e) => {
+    const c = e.target.closest(".nav-crumb");
+    if(c) goNavTo(Number(c.dataset.i));
+  });
+  list.appendChild(bc);
+  const content = document.createElement("div");
+  content.className = "nav-content";
+  content.innerHTML = `<div class="tree-loading">加载中…</div>`;
+  list.appendChild(content);
+  const cur = currentTree.navPath[currentTree.navPath.length - 1];
+  (async () => {
+    let items = null;
+    if(cur.item){
+      items = await fetchDirItems(cur.item);
+      logOp("导航目录: " + (cur.item.fileName || "") + " " + (items ? items.length : 0) + " 项");
+    }else{
+      items = currentTree.items || [];
+    }
+    if(items === null){
+      content.innerHTML = `<div class="tree-empty">无法加载：接口无有效返回</div>`;
+      return;
+    }
+    renderTreeItems(items, content);
+    renderTreeSummary();
+  })();
+}
+function enterNavDir(item){
+  currentTree.navPath.push({name: item.fileName || "未命名", item});
+  renderNavView();
+}
+function goNavTo(i){
+  if(i < 0 || i >= currentTree.navPath.length) return;
+  currentTree.navPath.length = i + 1;
+  renderNavView();
 }
 async function expandAfterRebuild(list, openKeys){
   const nodes = [...list.querySelectorAll(".tree-item.folder")];
@@ -1781,26 +1855,21 @@ async function toggleFolder(node, item){
   await loadFolderChildren(item, wrapper, key);
 }
 
-async function loadFolderChildren(item, wrapper, key, opts){
-  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
+async function fetchDirItems(item, opts){
+  opts = opts || {};
   const cacheKey = item.parserUrl || "";
   const cacheHit = dirCache.get(cacheKey);
-  if(cacheHit && Date.now() - cacheHit.ts < DIR_TTL){
-    treeLoadedKeys.add(key);
-    renderTreeItems(cacheHit.items, wrapper);
-    renderTreeSummary();
-    return cacheHit.items;
-  }
+  if(cacheHit && Date.now() - cacheHit.ts < DIR_TTL) return cacheHit.items;
   const dirId = item.fileId || "";
   try{
     const u = new URL(item.parserUrl);
     let baseLocal = "/parse" + u.pathname + u.search;
-    // 1) 补 API Key（token URL 参数方式，v2.0.15 实测可正常展开目录；服务端对 URL token 与 X-API-Key 头处理不同）
+    // 1) 补 API Key（token URL 参数方式；服务端对 URL token 与 X-API-Key 头处理不同）
     if(!u.searchParams.has("token")){
       const key2 = parseApiKey();
       if(key2) baseLocal += (baseLocal.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(key2);
     }
-    // 2) 补分享密码（带密码链接需独立 pwd 参数；parserUrl 里 pwd 可能嵌在 url 内）
+    // 2) 补分享密码（带密码链接需独立 pwd 参数）
     if(currentTree && currentTree.rootPwd && !u.searchParams.has("pwd")){
       baseLocal += "&pwd=" + encodeURIComponent(currentTree.rootPwd);
     }
@@ -1842,56 +1911,57 @@ async function loadFolderChildren(item, wrapper, key, opts){
         continue;
       }
       if(!list.length){
-        treeLoadedKeys.add(key);
         dirCache.set(cacheKey, {items: [], ts: Date.now()});
-        wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
         return [];
       }
       // 过滤父目录混入（顶层已渲染的项）
       const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
       if(!filtered.length){
-        // 过滤后为空：若原始列表里只有"当前目录自身"（id 与 dirId 相同，是 123 返回的进入深层入口），保留渲染，可继续点入
+        // 过滤后为空：123 网盘先返回"当前目录自身"作为入口，需用其 parserUrl 再次请求——自动深入
         const selfItems = list.filter(it => {
           const id = it.fileId || it.parserUrl;
           return id && idParam && String(id) === String(idParam);
         });
-        if(selfItems.length && !(opts && opts.deep >= 3)){
-          // 123 网盘先返回"当前目录自身"作为入口（无真实内容），需用其 parserUrl 再次请求才返回真实子项——自动深入
+        if(selfItems.length && !(opts.deep >= 3)){
           const deepItem = selfItems[0];
           logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
-          const deepItems = await loadFolderChildren(deepItem, wrapper, key, {deep: ((opts && opts.deep) || 0) + 1});
+          const deepItems = await fetchDirItems(deepItem, {deep: (opts.deep || 0) + 1});
           if(deepItems && deepItems.length) dirCache.set(cacheKey, {items: deepItems, ts: Date.now()});
           return deepItems;
         }
         if(selfItems.length){
-          // 深入到底仍是自身：渲染自身项兜底（保留可点入入口）
-          treeLoadedKeys.add(key);
           dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
           logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
-          renderTreeItems(selfItems, wrapper);
-          renderTreeSummary();
           return selfItems;
         }
         lastDetail = "原始 " + list.length + " 项全为顶层重复(" + (item.fileName || "") + ")";
         continue; // 试下一个参数名
       }
-      treeLoadedKeys.add(key);
       dirCache.set(cacheKey, {items: filtered, ts: Date.now()});
       logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", ") + " [" + local.slice(-80) + "]");
-      renderTreeItems(filtered, wrapper);
-      renderTreeSummary();
       return filtered;
     }
     // 全部尝试失败
     logOp("目录加载失败: " + lastDetail + " dirId=" + (idParam || "无"));
-    treeLoadedKeys.add(key);
-    wrapper.innerHTML = `<div class="tree-empty">无法加载：${escapeHtml(lastDetail || "接口无有效返回")}</div>`;
     return null;
   }catch(e){
     logOp("目录加载异常: " + (e && e.message));
-    wrapper.innerHTML = `<div class="tree-empty">加载失败：${escapeHtml(e && e.message)}</div>`;
     return null;
   }
+}
+
+async function loadFolderChildren(item, wrapper, key, opts){
+  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
+  const items = await fetchDirItems(item, opts);
+  if(items === null){
+    treeLoadedKeys.add(key);
+    wrapper.innerHTML = `<div class="tree-empty">无法加载：接口无有效返回</div>`;
+    return null;
+  }
+  treeLoadedKeys.add(key);
+  renderTreeItems(items, wrapper);
+  renderTreeSummary();
+  return items;
 }
 
 function toggleSelect(idKey, item){
