@@ -170,6 +170,32 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 }
 .rule{flex:1;height:1px;background:var(--border-soft);margin:0 10px}
 
+/* ===== 视图切换 ===== */
+.view-switch{display:inline-flex;gap:3px;margin-left:auto}
+.view-switch button{width:28px;height:25px;border:1px solid var(--border-soft);background:var(--surface-2);color:var(--text-2);border-radius:6px;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:all .15s}
+.view-switch button:hover{color:var(--text)}
+.view-switch button.active{color:#fff;background:var(--accent);border-color:var(--accent)}
+/* 图标视图（并排卡片） */
+.tree.tree-grid, .tree-children.tree-grid{display:flex;flex-wrap:wrap;gap:9px;padding:2px 0}
+.tree-children.tree-grid{margin-left:18px;padding-left:10px}
+.tree-grid .tree-item{width:calc(33.333% - 6px);min-width:78px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:12px 5px;position:relative;cursor:pointer}
+.tree-grid .tree-item .t-icon{width:40px;height:40px;border-radius:10px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:22px;height:22px}
+.tree-grid .tree-item .t-main{width:100%;min-width:0}
+.tree-grid .tree-item .t-name{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.tree-grid .tree-item .t-sub{font-size:10.5px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-check{display:none}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:5px;top:5px;padding:3px 6px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff}
+.tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
+.tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-grid .tree-item.folder .t-name{color:var(--warn)}
+/* 详情视图 */
+.tree-detail .tree-item{padding:12px 14px}
+.tree-detail .tree-item .t-name{font-size:14px}
+.tree-detail .tree-item .t-sub{font-size:12px;margin-top:3px}
+/* 网格子层缩进对齐 */
+.tree-grid > .tree-item{width:calc(33.333% - 6px)}
+
 /* ===== 表单（设置） ===== */
 .set-group{margin-bottom:16px}
 .set-group-title{font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:9px;letter-spacing:.4px}
@@ -1111,6 +1137,9 @@ let currentResult = null;      // 当前解析结果（单文件）
 let currentTree = null;        // 当前目录树 {rootUrl, rootPwd, panType, items, selected:Map}
 let currentLinkDetail = null;  // 当前分享详情（linkInfo.data，渲染"分享详情"卡片）
 let treeLoadedKeys = new Set(); // 已加载的目录 key
+let viewMode = localStorage.getItem("nfd_view_mode") || "list"; // 视图: list/grid/detail
+const dirCache = new Map(); // 目录结果缓存: parserUrl -> {items, ts}（60s，自动深入结果也缓存）
+const DIR_TTL = 60 * 1000;
 
 /* ================= 剪贴板识别 ================= */
 function readClipboardText(){
@@ -1572,8 +1601,18 @@ async function renderTree(items, container){
   container.appendChild(card);
   const head = document.createElement("div");
   head.className = "card-title";
-  head.innerHTML = `目录文件 <span class="rule"></span><span class="tag info">${escapeHtml(currentTree.panName || "网盘")}</span>`;
+  head.innerHTML = `目录文件 <span class="rule"></span><span class="tag info">${escapeHtml(currentTree.panName || "网盘")}</span>
+    <span class="view-switch">
+      <button data-view="list" class="${viewMode === "list" ? "active" : ""}" title="列表视图">☰</button>
+      <button data-view="grid" class="${viewMode === "grid" ? "active" : ""}" title="图标视图">▦</button>
+      <button data-view="detail" class="${viewMode === "detail" ? "active" : ""}" title="详情视图">≣</button>
+    </span>`;
   card.appendChild(head);
+  const vs = head.querySelector(".view-switch");
+  if(vs) vs.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]");
+    if(b) setViewMode(b.dataset.view);
+  });
   const summary = document.createElement("div");
   summary.className = "tree-summary";
   summary.id = "treeSummary";
@@ -1588,8 +1627,12 @@ async function renderTree(items, container){
 
 function renderTreeItems(items, list){
   list.innerHTML = "";
+  list.classList.remove("tree-list", "tree-grid", "tree-detail");
+  list.classList.add(viewMode === "grid" ? "tree-grid" : viewMode === "detail" ? "tree-detail" : "tree-list");
   const seenIds = new Set();
   const seenFolderNames = new Set();
+  const gridMode = viewMode === "grid";
+  const detailMode = viewMode === "detail";
   for(const item of items){
     const idKey = item.fileId || item.parserUrl;
     const isFolder = (item.fileType || "").toLowerCase() === "folder";
@@ -1603,17 +1646,45 @@ function renderTreeItems(items, list){
     }
     if(idKey) seenIds.add(idKey);
     const node = document.createElement("div");
-    node.className = "tree-item" + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
+    node.className = "tree-item" + (gridMode ? " grid-item" : detailMode ? " detail-item" : "")
+      + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
+    node.dataset.key = idKey || "";
+    node._item = item;
     const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
-    node.innerHTML = `
-      ${isFolder ? `<div class="t-icon">${ICONS.folder}</div>` : `<div class="t-icon">${fileTypeIcon(item.fileType)}</div>`}
-      <div class="t-main">
-        <div class="t-name">${escapeHtml(item.fileName)}</div>
-        <div class="t-sub">${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}</div>
-      </div>
-      <div class="t-check">${ICONS.check}</div>
-      <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
-    // 点击行 = 勾选
+    const iconHtml = `<div class="t-icon">${isFolder ? ICONS.folder : fileTypeIcon(item.fileType)}</div>`;
+    if(gridMode){
+      // 并排图标视图：图标卡片
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-sub">${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`;
+    }else if(detailMode){
+      // 详情视图：完整字段（类型 · 大小 · 时间）
+      const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
+      const sub = `${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}${tm ? " · " + escapeHtml(tm) : ""}`;
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-sub">${sub}</div>
+        </div>
+        <div class="t-check">${ICONS.check}</div>
+        <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
+    }else{
+      // 列表视图（默认紧凑行）
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-sub">${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}</div>
+        </div>
+        <div class="t-check">${ICONS.check}</div>
+        <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
+    }
+    // 点击行 = 勾选/展开
     node.addEventListener("click", (e) => {
       if(e.target.closest(".t-dl")) return;
       if(isFolder){
@@ -1631,6 +1702,53 @@ function renderTreeItems(items, list){
   }
 }
 
+// ========== 视图切换：更新模式 + 重建树（保留展开状态，缓存命中秒开） ==========
+function setViewMode(mode){
+  if(viewMode === mode) return;
+  viewMode = mode;
+  localStorage.setItem("nfd_view_mode", mode);
+  $$(".view-switch button").forEach(b => b.classList.toggle("active", b.dataset.view === mode));
+  rebuildTree();
+}
+function rebuildTree(){
+  const treeList = $("#treeList");
+  if(!treeList) return;
+  const openKeys = new Set();
+  treeList.querySelectorAll(".tree-item.open").forEach(n => { if(n.dataset.key) openKeys.add(n.dataset.key); });
+  const parent = treeList.parentElement;
+  renderTree(currentTree.items, parent); // 重建整棵树（标题/视图按钮/summary/列表）
+  const newList = $("#treeList");
+  if(newList) expandAfterRebuild(newList, openKeys);
+}
+async function expandAfterRebuild(list, openKeys){
+  const nodes = [...list.querySelectorAll(".tree-item.folder")];
+  for(const node of nodes){
+    const key = node.dataset.key;
+    if(!key || !openKeys.has(key)) continue;
+    const item = node._item;
+    if(!item) continue;
+    node.classList.add("open");
+    const wrapper = document.createElement("div");
+    wrapper.className = "tree-children";
+    node.after(wrapper);
+    await renderChildrenFromCache(item, wrapper, key); // 等本层渲染完成
+    await expandAfterRebuild(wrapper, openKeys);       // 再递归深层
+  }
+}
+async function renderChildrenFromCache(item, wrapper, key){
+  const ck = item.parserUrl;
+  const hit = dirCache.get(ck);
+  if(hit && Date.now() - hit.ts < DIR_TTL){
+    treeLoadedKeys.add(key);
+    renderTreeItems(hit.items, wrapper);
+    renderTreeSummary();
+    return;
+  }
+  wrapper.innerHTML = `<div class="tree-loading">加载子目录…</div>`;
+  wrapper.dataset.loading = "1";
+  await loadFolderChildren(item, wrapper, key);
+}
+
 async function toggleFolder(node, item){
   const key = item.fileId || item.parserUrl;
   node.classList.toggle("open");
@@ -1640,7 +1758,15 @@ async function toggleFolder(node, item){
       child.style.display = "flex";
       if(!treeLoadedKeys.has(key) && !child.dataset.loading){
         child.dataset.loading = "1";
-        await loadFolderChildren(item, child, key);
+        const ck = item.parserUrl;
+        const hit = dirCache.get(ck);
+        if(hit && Date.now() - hit.ts < DIR_TTL){
+          treeLoadedKeys.add(key);
+          renderTreeItems(hit.items, child);
+          renderTreeSummary();
+        }else{
+          await loadFolderChildren(item, child, key);
+        }
       }
     }else{
       child.style.display = "none";
@@ -1657,6 +1783,14 @@ async function toggleFolder(node, item){
 
 async function loadFolderChildren(item, wrapper, key, opts){
   logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
+  const cacheKey = item.parserUrl || "";
+  const cacheHit = dirCache.get(cacheKey);
+  if(cacheHit && Date.now() - cacheHit.ts < DIR_TTL){
+    treeLoadedKeys.add(key);
+    renderTreeItems(cacheHit.items, wrapper);
+    renderTreeSummary();
+    return cacheHit.items;
+  }
   const dirId = item.fileId || "";
   try{
     const u = new URL(item.parserUrl);
@@ -1683,7 +1817,12 @@ async function loadFolderChildren(item, wrapper, key, opts){
       ? currentTree.items.map(it => it.fileId || it.parserUrl).filter(Boolean) : []);
     let lastDetail = "";
     for(const local of tries){
-      const resp = await fetch(local);
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      let resp;
+      try{ resp = await fetch(local, {signal: ctrl.signal}); }
+      catch(e){ clearTimeout(to); lastDetail = "请求超时/失败"; continue; }
+      clearTimeout(to);
       const text = await resp.text().catch(() => "");
       if(!resp.ok){
         lastDetail = "HTTP " + resp.status + " " + text.trim().slice(0, 120);
@@ -1704,8 +1843,9 @@ async function loadFolderChildren(item, wrapper, key, opts){
       }
       if(!list.length){
         treeLoadedKeys.add(key);
+        dirCache.set(cacheKey, {items: [], ts: Date.now()});
         wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
-        return;
+        return [];
       }
       // 过滤父目录混入（顶层已渲染的项）
       const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
@@ -1719,32 +1859,38 @@ async function loadFolderChildren(item, wrapper, key, opts){
           // 123 网盘先返回"当前目录自身"作为入口（无真实内容），需用其 parserUrl 再次请求才返回真实子项——自动深入
           const deepItem = selfItems[0];
           logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
-          return await loadFolderChildren(deepItem, wrapper, key, {deep: ((opts && opts.deep) || 0) + 1});
+          const deepItems = await loadFolderChildren(deepItem, wrapper, key, {deep: ((opts && opts.deep) || 0) + 1});
+          if(deepItems && deepItems.length) dirCache.set(cacheKey, {items: deepItems, ts: Date.now()});
+          return deepItems;
         }
         if(selfItems.length){
           // 深入到底仍是自身：渲染自身项兜底（保留可点入入口）
           treeLoadedKeys.add(key);
+          dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
           logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
           renderTreeItems(selfItems, wrapper);
           renderTreeSummary();
-          return;
+          return selfItems;
         }
         lastDetail = "原始 " + list.length + " 项全为顶层重复(" + (item.fileName || "") + ")";
         continue; // 试下一个参数名
       }
       treeLoadedKeys.add(key);
+      dirCache.set(cacheKey, {items: filtered, ts: Date.now()});
       logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", ") + " [" + local.slice(-80) + "]");
       renderTreeItems(filtered, wrapper);
       renderTreeSummary();
-      return;
+      return filtered;
     }
     // 全部尝试失败
     logOp("目录加载失败: " + lastDetail + " dirId=" + (idParam || "无"));
     treeLoadedKeys.add(key);
     wrapper.innerHTML = `<div class="tree-empty">无法加载：${escapeHtml(lastDetail || "接口无有效返回")}</div>`;
+    return null;
   }catch(e){
     logOp("目录加载异常: " + (e && e.message));
     wrapper.innerHTML = `<div class="tree-empty">加载失败：${escapeHtml(e && e.message)}</div>`;
+    return null;
   }
 }
 
