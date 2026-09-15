@@ -1650,17 +1650,23 @@ async function loadFolderChildren(item, wrapper, key){
     // 服务端生成的 parserUrl 通常不带 token，需与顶层目录一样补上 API Key，否则接口 500/401
     const u = new URL(item.parserUrl);
     let local = "/parse" + u.pathname + u.search;
+    // 1) 补 API Key（服务端生成的 parserUrl 通常不带 token，顶层 apiGetFileList 是带 token 的）
     if(!u.searchParams.has("token")){
       const key = parseApiKey();
       if(key) local += (local.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(key);
     }
+    // 2) 补分享密码：带密码的链接（如 123 盘），pwd 需作为独立参数，嵌在 url 参数内服务端不识别
+    if(currentTree && currentTree.rootPwd && !u.searchParams.has("pwd")){
+      local += "&pwd=" + encodeURIComponent(currentTree.rootPwd);
+    }
     const resp = await fetch(local);
+    const text = await resp.text().catch(() => "");
     if(!resp.ok){
-      logOp("目录加载失败: HTTP " + resp.status + " " + local.slice(0, 50));
+      const snippet = text.trim().slice(0, 300);
+      logOp("目录加载失败: HTTP " + resp.status + " " + local + (snippet ? " 响应=" + snippet : ""));
       wrapper.innerHTML = `<div class="tree-empty">无法加载（HTTP ${resp.status}）</div>`;
       return;
     }
-    const text = await resp.text().catch(() => "");
     let json = null;
     try{ json = JSON.parse(text); }catch(e){}
     // 兼容多种返回格式：{code,data} / {data} / 直接数组 / {list} / {files}
