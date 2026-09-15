@@ -777,6 +777,8 @@ func socks5Transport(proxyAddr, proxyUser, proxyPass string) (*http.Transport, e
 }
 
 // parseProxy 将 /parse/* 转发到 189.qaiu.top（去掉 /parse 前缀）
+var parseProxyClient = &http.Client{Timeout: 20 * time.Second}
+
 func parseProxy(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/parse")
 	target := ParserBase + path
@@ -788,7 +790,7 @@ func parseProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad proxy request", http.StatusBadRequest)
 		return
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := parseProxyClient.Do(req)
 	if err != nil {
 		http.Error(w, "解析服务不可达: "+err.Error(), http.StatusBadGateway)
 		return

@@ -1644,21 +1644,44 @@ async function toggleFolder(node, item){
 }
 
 async function loadFolderChildren(item, wrapper, key){
+  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 50));
   try{
     // parserUrl 为 189.qaiu.top 的短链地址，转本地代理访问
     const u = new URL(item.parserUrl);
     const local = "/parse" + u.pathname + u.search;
     const resp = await fetch(local);
-    const json = await resp.json().catch(() => null);
-    if(!json || json.code !== 200 || !Array.isArray(json.data) || !json.data.length){
-      wrapper.innerHTML = `<div class="tree-empty">空目录或无法加载</div>`;
+    if(!resp.ok){
+      logOp("目录加载失败: HTTP " + resp.status + " " + local.slice(0, 50));
+      wrapper.innerHTML = `<div class="tree-empty">无法加载（HTTP ${resp.status}）</div>`;
+      return;
+    }
+    const text = await resp.text().catch(() => "");
+    let json = null;
+    try{ json = JSON.parse(text); }catch(e){}
+    // 兼容多种返回格式：{code,data} / {data} / 直接数组 / {list} / {files}
+    let list = null;
+    if(Array.isArray(json)) list = json;
+    else if(json && Array.isArray(json.data)) list = json.data;
+    else if(json && Array.isArray(json.list)) list = json.list;
+    else if(json && Array.isArray(json.files)) list = json.files;
+    const code = (json && typeof json.code !== "undefined") ? Number(json.code) : 200;
+    if(code !== 200){
+      const msg = (json && json.msg) || ("接口错误 code=" + json?.code);
+      logOp("目录加载失败: " + msg + " " + local.slice(0, 50));
+      wrapper.innerHTML = `<div class="tree-empty">无法加载：${escapeHtml(msg)}</div>`;
+      return;
+    }
+    if(!list || !list.length){
+      treeLoadedKeys.add(key);
+      wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
       return;
     }
     treeLoadedKeys.add(key);
-    renderTreeItems(json.data, wrapper);
+    renderTreeItems(list, wrapper);
     renderTreeSummary();
   }catch(e){
-    wrapper.innerHTML = `<div class="tree-empty">加载失败：${escapeHtml(e.message)}</div>`;
+    logOp("目录加载异常: " + (e && e.message));
+    wrapper.innerHTML = `<div class="tree-empty">加载失败：${escapeHtml(e && e.message)}</div>`;
   }
 }
 
