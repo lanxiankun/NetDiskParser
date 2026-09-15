@@ -1245,7 +1245,6 @@ async function handleParse(){
       const name = raw.startsWith("magnet:") ? "磁力任务" : "BT任务";
       await gopeedCreateTask(raw, name, {});
       toast("已添加到下载", "ok");
-      navigate("downloads");
     }catch(err){
       toast("添加下载失败：" + err.message, "err");
     }
@@ -1503,7 +1502,6 @@ async function downloadToGopeed(r){
   try{
     const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam, headers, pan === "uc" ? false : undefined), r.fileInfo?.fileName, headers, pan);
     toast("已发送到 Gopeed，任务 #" + id.slice(0, 8), "ok");
-    setTimeout(() => navigate("downloads"), 700);
   }catch(err){
     if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
       toast("无法连接内置下载引擎", "err");
@@ -1703,7 +1701,6 @@ async function batchDownloadSelected(){
       }catch(e){ fail++; }
     }
     toast(`已发送 ${ok} 个任务${fail ? "，失败 " + fail + " 个" : ""}`, ok ? "ok" : "err");
-    if(ok) setTimeout(() => navigate("downloads"), 700);
   }catch(err){
     if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
       toast("内置下载引擎异常", "err");
@@ -1720,7 +1717,6 @@ async function downloadFileItem(item){
     const t = await buildDownloadTarget(item.parserUrl, pan, currentTree.otherParam);
     await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), item.fileName, t.headers, pan);
     toast("已发送到 Gopeed", "ok");
-    setTimeout(() => navigate("downloads"), 600);
   }catch(err){
     if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
       toast("内置下载引擎异常", "err");
@@ -2246,7 +2242,6 @@ function applyRoute(){
   if(valid === "parse"){
     setGreet();
     ensureGreetTimer();
-    autoFillFromClipboard(true);
   }
   if(valid === "history"){
     renderHistory();
@@ -2396,9 +2391,6 @@ function init(){
   if(!location.hash) navigate("parse");
   // 首次进入自动检测连接（静默）
   setTimeout(() => refreshGopeedStatus(true), 400);
-  // 自动读取剪贴板识别链接与提取码
-  setTimeout(() => autoFillFromClipboard(true), 1000);
-  setTimeout(() => autoFillFromClipboard(true), 2500);
   setGreet();
   syncParseBtn();
   // 波形绘制循环（节流）
