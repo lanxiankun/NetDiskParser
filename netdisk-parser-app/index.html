@@ -1661,11 +1661,11 @@ async function loadFolderChildren(item, wrapper, key){
   try{
     const u = new URL(item.parserUrl);
     let baseLocal = "/parse" + u.pathname + u.search;
-    // 1) 鉴权：跟随解析站网页版用 X-API-Key 请求头（服务端对 token URL 参数与 X-API-Key 头的处理路径不同，
-    //    网页版目录展开走 X-API-Key 头且正常，App 之前用 token 参数返回的是根层）
-    const apiKey = parseApiKey() || "";
-    const hdrs = {};
-    if(apiKey) hdrs["X-API-Key"] = apiKey;
+    // 1) 补 API Key（token URL 参数方式，v2.0.15 实测可正常展开目录；服务端对 URL token 与 X-API-Key 头处理不同）
+    if(!u.searchParams.has("token")){
+      const key2 = parseApiKey();
+      if(key2) baseLocal += (baseLocal.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(key2);
+    }
     // 2) 补分享密码（带密码链接需独立 pwd 参数；parserUrl 里 pwd 可能嵌在 url 内）
     if(currentTree && currentTree.rootPwd && !u.searchParams.has("pwd")){
       baseLocal += "&pwd=" + encodeURIComponent(currentTree.rootPwd);
@@ -1683,7 +1683,7 @@ async function loadFolderChildren(item, wrapper, key){
       ? currentTree.items.map(it => it.fileId || it.parserUrl).filter(Boolean) : []);
     let lastDetail = "";
     for(const local of tries){
-      const resp = await fetch(local, {headers: hdrs});
+      const resp = await fetch(local);
       const text = await resp.text().catch(() => "");
       if(!resp.ok){
         lastDetail = "HTTP " + resp.status + " " + text.trim().slice(0, 120);
@@ -1707,9 +1707,21 @@ async function loadFolderChildren(item, wrapper, key){
         wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
         return;
       }
-      // 过滤父目录混入（自身/顶层重复）
+      // 过滤父目录混入（顶层已渲染的项）
       const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
       if(!filtered.length){
+        // 过滤后为空：若原始列表里只有"当前目录自身"（id 与 dirId 相同，是 123 返回的进入深层入口），保留渲染，可继续点入
+        const selfItems = list.filter(it => {
+          const id = it.fileId || it.parserUrl;
+          return id && idParam && String(id) === String(idParam);
+        });
+        if(selfItems.length){
+          treeLoadedKeys.add(key);
+          logOp("目录返回: 仅当前目录自身(可继续进入) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
+          renderTreeItems(selfItems, wrapper);
+          renderTreeSummary();
+          return;
+        }
         lastDetail = "原始 " + list.length + " 项全为顶层重复(" + (item.fileName || "") + ")";
         continue; // 试下一个参数名
       }
