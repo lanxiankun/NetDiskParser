@@ -1,0 +1,24 @@
+# 构建产物
+dist/
+build/
+*.so
+*.apk
+netdisk-parser-app/netdisk-parser-app
+netdisk-parser-app/netdisk-parser-app-*
+netdisk-parser-app/libnetdiskparser.*
+netdisk-parser-app/app-run.log
+
+# 签名密钥（切勿提交）
+*.keystore
+*.jks
+
+# 日志
+*.log
+logs/
+
+# Go vendor（依赖走 go.mod replace）
+netdisk-parser-app/vendor/
+
+# 系统
+.DS_Store
+Thumbs.db

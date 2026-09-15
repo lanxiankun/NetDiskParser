@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.netdisk.parser"
+    android:versionCode="7"
+    android:versionName="2.0.2">
+
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- 前台保活服务：通知栏进度 + 后台下载不中断 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- 下载到公共下载目录所需权限：Android 10 及以下动态请求；Android 11+ 走 MANAGE_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <!-- 安装 APK：调用系统安装器安装已下载的包 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+    <application
+        android:icon="@mipmap/ic_launcher"
+        android:label="云盘解析下载器"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:requestLegacyExternalStorage="true"
+        android:extractNativeLibs="false">
+
+        <activity android:name=".MainActivity"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- 文件打开授权：下载完成后调起外部应用打开/安装（content:// 授权） -->
+        <provider
+            android:name=".LocalFileProvider"
+            android:authorities="com.netdisk.parser.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true"/>
+
+        <!-- 前台保活服务（dataSync 类型：后台数据传输） -->
+        <service android:name=".KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
+    </application>
+</manifest>
