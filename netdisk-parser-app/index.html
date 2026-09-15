@@ -2083,24 +2083,6 @@ function renderStatusCard(){
       pillTxt.textContent = "引擎异常";
     }
   }
-  // 下载页状态卡
-  const card = $("#gopeedStatus");
-  const title = $("#gopeedStatusTitle");
-  const sub = $("#gopeedStatusSub");
-  card.classList.remove("on","off","pending");
-  if(gopeedOnline === null){
-    card.classList.add("pending");
-    title.textContent = "检测中…";
-    sub.textContent = "内置下载引擎";
-  }else if(gopeedOnline){
-    card.classList.add("on");
-    title.textContent = "内置下载引擎运行中" + (gopeedVersion ? " · v" + gopeedVersion : "");
-    sub.textContent = "Gopeed 已内置于本 App，下载无需任何额外安装";
-  }else{
-    card.classList.add("off");
-    title.textContent = "内置下载引擎异常";
-    sub.textContent = "请重启本 App";
-  }
 }
 
 async function refreshTasks(){
@@ -2698,7 +2680,6 @@ function bindEvents(){
   $("#testConnBtn").addEventListener("click", async () => {
     await refreshGopeedStatus(false);
   });
-  $("#gopeedRefresh").addEventListener("click", () => refreshGopeedStatus(true));
 
   $("#logsBtn").addEventListener("click", openLogsModal);
   $("#logsRefresh").addEventListener("click", loadLogs);
