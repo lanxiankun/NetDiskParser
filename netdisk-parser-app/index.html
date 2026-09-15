@@ -1763,6 +1763,7 @@ function renderNavView(){
     currentTree.navContentEl = content;
     renderTreeItems(items, content);
     renderTreeSummary();
+    prefetchVisibleDirs(items); // 后台预取可见子目录，点击秒开
   })();
 }
 function enterNavDir(item){
@@ -1843,29 +1844,48 @@ async function fetchDirItems(item, opts){
         });
         if(selfItems.length && !(opts.deep >= 3)){
           const deepItem = selfItems[0];
-          logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
+          if(!opts.silent) logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
           const deepItems = await fetchDirItems(deepItem, {deep: (opts.deep || 0) + 1});
           if(deepItems && deepItems.length) dirCache.set(cacheKey, {items: deepItems, ts: Date.now()});
           return deepItems;
         }
         if(selfItems.length){
           dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
-          logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
+          if(!opts.silent) logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
           return selfItems;
         }
         lastDetail = "原始 " + list.length + " 项全为顶层重复(" + (item.fileName || "") + ")";
         continue; // 试下一个参数名
       }
       dirCache.set(cacheKey, {items: filtered, ts: Date.now()});
-      logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", ") + " [" + local.slice(-80) + "]");
+      if(!opts.silent) logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", ") + " [" + local.slice(-80) + "]");
       return filtered;
     }
     // 全部尝试失败
-    logOp("目录加载失败: " + lastDetail + " dirId=" + (idParam || "无"));
+    if(!opts.silent) logOp("目录加载失败: " + lastDetail + " dirId=" + (idParam || "无"));
     return null;
   }catch(e){
-    logOp("目录加载异常: " + (e && e.message));
+    if(!opts.silent) logOp("目录加载异常: " + (e && e.message));
     return null;
+  }
+}
+
+// 后台预取当前目录前 N 个文件夹内容（静默、串行），用户点击时命中 dirCache 秒开
+let prefetchSeq = 0;
+async function prefetchVisibleDirs(items){
+  const seq = ++prefetchSeq;
+  const dirs = (items || []).filter(it =>
+    (it.fileType || "").toLowerCase() === "folder"
+  ).slice(0, 6);
+  if(!dirs.length) return;
+  for(const d of dirs){
+    if(seq !== prefetchSeq) return; // 已切换目录，停止本次预取
+    try{
+      const ck = d.parserUrl || "";
+      const hit = dirCache.get(ck);
+      if(hit && Date.now() - hit.ts < DIR_TTL) continue;
+      await fetchDirItems(d, {deep: 1, silent: true});
+    }catch(e){ /* 预取失败静默 */ }
   }
 }
 
