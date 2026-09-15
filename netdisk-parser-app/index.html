@@ -1350,7 +1350,9 @@ async function handleParse(){
       renderTree(fileList, $("#resultArea"));
       currentLinkDetail = linkInfo;
       renderShareDetail();
-      addHistory({url, pwd, name: (linkInfo?.shareLinkInfo?.panName || "网盘") + " 目录", mode: "dir", panName: linkInfo?.shareLinkInfo?.panName || ""});
+      // 历史记录用第一层目录名（根目录第一个文件夹），找不到才回退"网盘名 目录"
+      const firstDir = fileList.find(it => (it.fileType || "").toLowerCase() === "folder") || fileList[0];
+      addHistory({url, pwd, name: (firstDir && firstDir.fileName) || ((linkInfo?.shareLinkInfo?.panName || "网盘") + " 目录"), mode: "dir", panName: linkInfo?.shareLinkInfo?.panName || ""});
       autoSaveCookie(linkInfo, fileList);
     }else{
       // 单文件模式
