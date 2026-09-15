@@ -1739,6 +1739,8 @@ function renderNavView(){
     if(c) goNavTo(Number(c.dataset.i));
   });
   list.appendChild(bc);
+  // 自动滚动到最新层级（最右端），进入下一层后新目录名完整可见不被截断
+  requestAnimationFrame(() => { bc.scrollLeft = bc.scrollWidth; });
   // 内容区
   const content = document.createElement("div");
   content.className = "nav-content";
