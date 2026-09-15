@@ -4,7 +4,7 @@ Android 网盘解析下载 App：粘贴分享链接 → 自动识别网盘与提
 
 ## 架构
 
-- **Android 壳**：Java 原生（WebView 容器 + 前台保活服务 + FileProvider）
+- **Android 壳**：Java 原生（前台保活服务 + FileProvider）
 - **核心服务**：Go 语言编译为 `.so`（本地 HTTP 服务 + 解析接口转发 + 下载代理），经 JNI 启动
 - **下载引擎**：内置 Gopeed（Go 开源下载器，以库形式集成，负责分片并发下载）
 - **界面**：原生 HTML/CSS/JS（单文件 `index.html`，WebView 加载本地服务渲染）
