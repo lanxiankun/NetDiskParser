@@ -790,6 +790,13 @@ func parseProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad proxy request", http.StatusBadRequest)
 		return
 	}
+	// 透传必要的请求头（解析站接口支持 X-API-Key 鉴权，网页版即用请求头方式）
+	for k := range r.Header {
+		if strings.EqualFold(k, "Host") || strings.EqualFold(k, "Content-Length") {
+			continue
+		}
+		req.Header.Set(k, r.Header.Get(k))
+	}
 	resp, err := parseProxyClient.Do(req)
 	if err != nil {
 		http.Error(w, "解析服务不可达: "+err.Error(), http.StatusBadGateway)
