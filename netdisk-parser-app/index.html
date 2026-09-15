@@ -176,11 +176,11 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 .view-switch button:hover{color:var(--text)}
 .view-switch button.active{color:#fff;background:var(--accent);border-color:var(--accent)}
 /* 图标视图（文件管理器 4 列网格卡片：图标+名称+大小+时间，图1 风格） */
-.nav-content.tree-grid{display:flex;flex-wrap:wrap;gap:10px}
-.nav-content.tree-list{display:flex;flex-direction:column;gap:6px}
-.tree-grid .tree-item{width:calc(25% - 8px);min-width:72px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:10px 4px 8px;position:relative;cursor:pointer}
-@media (min-width:520px){ .tree-grid .tree-item{width:calc(20% - 8px)} }
-@media (min-width:720px){ .tree-grid .tree-item{width:calc(16.66% - 8px)} }
+.nav-content.tree-grid{display:flex !important;flex-direction:row !important;flex-wrap:wrap !important;gap:10px !important;align-content:flex-start}
+.nav-content.tree-list{display:flex !important;flex-direction:column !important;gap:6px !important}
+.tree-grid .tree-item{flex:0 0 calc(25% - 8px);width:calc(25% - 8px);min-width:72px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:10px 4px 8px;position:relative;cursor:pointer}
+@media (min-width:520px){ .tree-grid .tree-item{flex-basis:calc(20% - 8px);width:calc(20% - 8px)} }
+@media (min-width:720px){ .tree-grid .tree-item{flex-basis:calc(16.66% - 8px);width:calc(16.66% - 8px)} }
 .tree-grid .tree-item .t-icon{width:44px;height:44px;border-radius:11px;flex:none}
 .tree-grid .tree-item .t-icon svg{width:24px;height:24px}
 .tree-grid .tree-item .t-main{width:100%;min-width:0}
@@ -1650,6 +1650,13 @@ function renderTreeItems(items, list){
   list.innerHTML = "";
   list.classList.remove("tree-list", "tree-grid");
   list.classList.add(viewMode === "grid" ? "tree-grid" : "tree-list");
+  // 布局内联双保险（避免 CSS 特异性问题导致网格不换行）
+  const gridMode0 = viewMode === "grid";
+  list.style.display = "flex";
+  list.style.flexWrap = gridMode0 ? "wrap" : "nowrap";
+  list.style.flexDirection = gridMode0 ? "row" : "column";
+  list.style.gap = gridMode0 ? "10px" : "6px";
+  list.style.alignContent = "flex-start";
   const seenIds = new Set();
   const seenFolderNames = new Set();
   const gridMode = viewMode === "grid";
@@ -1675,6 +1682,7 @@ function renderTreeItems(items, list){
     const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
     if(gridMode){
       // 图标视图：4 列网格卡片（图标 + 名称 + 大小 + 时间），图1 文件管理器风格
+      // 目录不可下载：不渲染下载按钮（点击进入下一层）
       node.innerHTML = `
         ${iconHtml}
         <div class="t-main">
@@ -1682,7 +1690,7 @@ function renderTreeItems(items, list){
           <div class="t-size">${item.sizeStr ? escapeHtml(item.sizeStr) : tagText}</div>
           ${tm ? `<div class="t-time">${escapeHtml(tm)}</div>` : ""}
         </div>
-        <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`;
+        ${isFolder ? "" : `<button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`}`;
     }else{
       // 列表视图：行（图标 + 名称 + 类型·大小·时间 + 勾选 + 下载）
       const sub = `${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}${tm ? " · " + escapeHtml(tm) : ""}`;
@@ -1692,10 +1700,10 @@ function renderTreeItems(items, list){
           <div class="t-name">${escapeHtml(item.fileName)}</div>
           <div class="t-sub">${sub}</div>
         </div>
-        <div class="t-check">${ICONS.check}</div>
-        <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
+        ${isFolder ? "" : `<div class="t-check">${ICONS.check}</div>`}
+        ${isFolder ? "" : `<button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`}`;
     }
-    // 点击：目录进入下一层（文件管理器式），文件勾选
+    // 点击：目录进入下一层（文件管理器式），文件勾选/下载
     node.addEventListener("click", (e) => {
       if(e.target.closest(".t-dl")) return;
       if(isFolder){
@@ -1705,7 +1713,7 @@ function renderTreeItems(items, list){
       }
     });
     const dlBtn = node.querySelector(".t-dl");
-    dlBtn.addEventListener("click", (e) => {
+    if(dlBtn) dlBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       downloadFileItem(item);
     });
