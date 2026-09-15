@@ -1646,9 +1646,14 @@ async function toggleFolder(node, item){
 async function loadFolderChildren(item, wrapper, key){
   logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 50));
   try{
-    // parserUrl 为 189.qaiu.top 的短链地址，转本地代理访问
+    // parserUrl 为 189.qaiu.top 的目录接口地址（如 /v2/getFileList?url=…），转本地代理访问
+    // 服务端生成的 parserUrl 通常不带 token，需与顶层目录一样补上 API Key，否则接口 500/401
     const u = new URL(item.parserUrl);
-    const local = "/parse" + u.pathname + u.search;
+    let local = "/parse" + u.pathname + u.search;
+    if(!u.searchParams.has("token")){
+      const key = parseApiKey();
+      if(key) local += (local.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(key);
+    }
     const resp = await fetch(local);
     if(!resp.ok){
       logOp("目录加载失败: HTTP " + resp.status + " " + local.slice(0, 50));
