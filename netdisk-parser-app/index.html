@@ -175,12 +175,24 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 .view-switch button{width:28px;height:25px;border:1px solid var(--border-soft);background:var(--surface-2);color:var(--text-2);border-radius:6px;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:all .15s}
 .view-switch button:hover{color:var(--text)}
 .view-switch button.active{color:#fff;background:var(--accent);border-color:var(--accent)}
-/* 图标视图（文件管理器大卡片：图标+名称+大小+时间） */
-.tree.tree-grid, .tree-children.tree-grid{display:flex;flex-wrap:wrap;gap:10px;padding:2px 0}
-.tree-children.tree-grid{margin-left:18px;padding-left:10px}
-.tree-grid .tree-item{width:calc(50% - 5px);min-width:92px;flex-direction:column;align-items:stretch;text-align:left;gap:6px;padding:12px;position:relative;cursor:pointer}
-@media (min-width:520px){ .tree-grid .tree-item{width:calc(33.333% - 7px)} }
-@media (min-width:720px){ .tree-grid .tree-item{width:calc(25% - 8px)} }
+/* 图标视图（文件管理器 4 列网格卡片：图标+名称+大小+时间，图1 风格） */
+.nav-content.tree-grid{display:flex;flex-wrap:wrap;gap:10px}
+.nav-content.tree-list{display:flex;flex-direction:column;gap:6px}
+.tree-grid .tree-item{width:calc(25% - 8px);min-width:72px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:10px 4px 8px;position:relative;cursor:pointer}
+@media (min-width:520px){ .tree-grid .tree-item{width:calc(20% - 8px)} }
+@media (min-width:720px){ .tree-grid .tree-item{width:calc(16.66% - 8px)} }
+.tree-grid .tree-item .t-icon{width:44px;height:44px;border-radius:11px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:24px;height:24px}
+.tree-grid .tree-item .t-main{width:100%;min-width:0}
+.tree-grid .tree-item .t-name{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;font-weight:550}
+.tree-grid .tree-item .t-size{font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-time{font-size:10px;color:var(--text-3);opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-check{display:none}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:5px;top:5px;padding:2px 6px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+.tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
+.tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-grid .tree-item.folder .t-name{color:var(--warn)}
+.tree-grid .tree-item.folder .t-icon svg{stroke:var(--warn)}
 .tree-grid .tree-item .t-icon{width:46px;height:46px;border-radius:11px;flex:none}
 .tree-grid .tree-item .t-icon svg{width:25px;height:25px}
 .tree-grid .tree-item .t-main{width:100%;min-width:0}
@@ -197,9 +209,8 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 .tree-detail .tree-item{padding:12px 14px}
 .tree-detail .tree-item .t-name{font-size:14px}
 .tree-detail .tree-item .t-sub{font-size:12px;margin-top:3px}
-/* 树浏览视图（面包屑 + 当前目录内容） */
-.tree.tree-nav{display:flex;flex-direction:column;gap:8px}
-.nav-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5}
+.nav-breadcrumb{display:flex;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.nav-breadcrumb::-webkit-scrollbar{display:none}
 .nav-crumb{color:var(--sky);cursor:pointer;padding:1px 4px;border-radius:5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav-crumb.cur{color:var(--text);font-weight:650;cursor:default}
 .nav-sep{color:var(--text-3)}
@@ -1146,7 +1157,7 @@ let currentResult = null;      // 当前解析结果（单文件）
 let currentTree = null;        // 当前目录树 {rootUrl, rootPwd, panType, items, selected:Map}
 let currentLinkDetail = null;  // 当前分享详情（linkInfo.data，渲染"分享详情"卡片）
 let treeLoadedKeys = new Set(); // 已加载的目录 key
-let viewMode = localStorage.getItem("nfd_view_mode") || "list"; // 视图: list/grid/detail
+let viewMode = localStorage.getItem("nfd_view_mode") || "grid"; // 视图: list/grid（文件管理器式浏览）
 const dirCache = new Map(); // 目录结果缓存: parserUrl -> {items, ts}（60s，自动深入结果也缓存）
 const DIR_TTL = 60 * 1000;
 
@@ -1614,7 +1625,6 @@ async function renderTree(items, container){
     <span class="view-switch">
       <button data-view="list" class="${viewMode === "list" ? "active" : ""}" title="列表视图">☰</button>
       <button data-view="grid" class="${viewMode === "grid" ? "active" : ""}" title="图标视图">▦</button>
-      <button data-view="tree" class="${viewMode === "tree" ? "active" : ""}" title="树浏览视图">⊞</button>
     </span>`;
   card.appendChild(head);
   const vs = head.querySelector(".view-switch");
@@ -1630,29 +1640,23 @@ async function renderTree(items, container){
   list.className = "tree";
   list.id = "treeList";
   card.appendChild(list);
-  if(viewMode === "tree"){
-    // 树浏览视图：面包屑导航 + 当前目录内容
-    currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
-    renderNavView();
-  }else{
-    renderTreeItems(items, list);
-  }
+  // 文件管理器式浏览：面包屑 + 当前目录内容（默认图标网格，图1 风格）
+  currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
+  renderNavView();
   renderTreeSummary();
 }
 
 function renderTreeItems(items, list){
   list.innerHTML = "";
-  list.classList.remove("tree-list", "tree-grid", "tree-detail");
-  list.classList.add(viewMode === "grid" ? "tree-grid" : viewMode === "detail" ? "tree-detail" : "tree-list");
+  list.classList.remove("tree-list", "tree-grid");
+  list.classList.add(viewMode === "grid" ? "tree-grid" : "tree-list");
   const seenIds = new Set();
   const seenFolderNames = new Set();
   const gridMode = viewMode === "grid";
-  const detailMode = viewMode === "detail" || viewMode === "tree";
-  const navMode = viewMode === "tree";
   for(const item of items){
     const idKey = item.fileId || item.parserUrl;
     const isFolder = (item.fileType || "").toLowerCase() === "folder";
-    // 去重：目录按文件名（服务端可能返回重复目录，如同名 movie 两行）；文件按 id
+    // 去重：目录按文件名（服务端可能返回重复目录）；文件按 id
     if(isFolder){
       const nm = (item.fileName || "").trim();
       if(nm && seenFolderNames.has(nm)) continue;
@@ -1662,15 +1666,15 @@ function renderTreeItems(items, list){
     }
     if(idKey) seenIds.add(idKey);
     const node = document.createElement("div");
-    node.className = "tree-item" + (gridMode ? " grid-item" : detailMode ? " detail-item" : "")
+    node.className = "tree-item" + (gridMode ? " grid-item" : "")
       + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
     node.dataset.key = idKey || "";
     node._item = item;
     const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
     const iconHtml = `<div class="t-icon">${isFolder ? ICONS.folder : fileTypeIcon(item.fileType)}</div>`;
+    const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
     if(gridMode){
-      // 图标视图：大卡片（图标 + 名称 + 大小 + 时间），文件管理器风格
-      const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
+      // 图标视图：4 列网格卡片（图标 + 名称 + 大小 + 时间），图1 文件管理器风格
       node.innerHTML = `
         ${iconHtml}
         <div class="t-main">
@@ -1679,9 +1683,8 @@ function renderTreeItems(items, list){
           ${tm ? `<div class="t-time">${escapeHtml(tm)}</div>` : ""}
         </div>
         <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`;
-    }else if(detailMode){
-      // 详情视图：完整字段（类型 · 大小 · 时间）
-      const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
+    }else{
+      // 列表视图：行（图标 + 名称 + 类型·大小·时间 + 勾选 + 下载）
       const sub = `${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}${tm ? " · " + escapeHtml(tm) : ""}`;
       node.innerHTML = `
         ${iconHtml}
@@ -1691,23 +1694,12 @@ function renderTreeItems(items, list){
         </div>
         <div class="t-check">${ICONS.check}</div>
         <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
-    }else{
-      // 列表视图（默认紧凑行）
-      node.innerHTML = `
-        ${iconHtml}
-        <div class="t-main">
-          <div class="t-name">${escapeHtml(item.fileName)}</div>
-          <div class="t-sub">${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}</div>
-        </div>
-        <div class="t-check">${ICONS.check}</div>
-        <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
     }
-    // 点击行 = 勾选/展开
+    // 点击：目录进入下一层（文件管理器式），文件勾选
     node.addEventListener("click", (e) => {
       if(e.target.closest(".t-dl")) return;
       if(isFolder){
-        if(navMode) enterNavDir(item);
-        else toggleFolder(node, item);
+        enterNavDir(item);
       }else{
         toggleSelect(idKey, item);
       }
@@ -1721,39 +1713,23 @@ function renderTreeItems(items, list){
   }
 }
 
-// ========== 视图切换：更新模式 + 重渲染内容（不重建卡片，保留展开状态） ==========
+// ========== 视图切换：保留当前导航位置，只重渲染内容 ==========
 function setViewMode(mode){
   if(viewMode === mode) return;
   viewMode = mode;
   localStorage.setItem("nfd_view_mode", mode);
   $$(".view-switch button").forEach(b => b.classList.toggle("active", b.dataset.view === mode));
-  rebuildTree();
-}
-function rebuildTree(){
-  const treeList = $("#treeList");
-  if(!treeList) return;
-  if(viewMode === "tree"){
-    // 树浏览视图：从根目录开始导航
-    currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
-    renderNavView();
-    return;
-  }
-  // 平铺视图：只重渲染列表内容（保留展开状态，缓存命中秒开）
-  const openKeys = new Set();
-  treeList.querySelectorAll(".tree-item.open").forEach(n => { if(n.dataset.key) openKeys.add(n.dataset.key); });
-  treeList.innerHTML = "";
-  renderTreeItems(currentTree.items, treeList);
+  renderNavView();
   renderTreeSummary();
-  expandAfterRebuild(treeList, openKeys);
 }
 
-// ========== 树浏览视图（图2 风格：面包屑 + 当前目录内容） ==========
+// ========== 文件管理器式浏览：面包屑 + 当前目录内容 ==========
 function renderNavView(){
   const list = $("#treeList");
   if(!list) return;
   list.innerHTML = "";
-  list.classList.remove("tree-list", "tree-grid", "tree-detail");
-  list.classList.add("tree-nav");
+  list.classList.remove("tree-list", "tree-grid");
+  // 面包屑（单行滚动）
   const bc = document.createElement("div");
   bc.className = "nav-breadcrumb";
   bc.innerHTML = currentTree.navPath.map((p, i) =>
@@ -1764,6 +1740,7 @@ function renderNavView(){
     if(c) goNavTo(Number(c.dataset.i));
   });
   list.appendChild(bc);
+  // 内容区
   const content = document.createElement("div");
   content.className = "nav-content";
   content.innerHTML = `<div class="tree-loading">加载中…</div>`;
@@ -1794,67 +1771,6 @@ function goNavTo(i){
   currentTree.navPath.length = i + 1;
   renderNavView();
 }
-async function expandAfterRebuild(list, openKeys){
-  const nodes = [...list.querySelectorAll(".tree-item.folder")];
-  for(const node of nodes){
-    const key = node.dataset.key;
-    if(!key || !openKeys.has(key)) continue;
-    const item = node._item;
-    if(!item) continue;
-    node.classList.add("open");
-    const wrapper = document.createElement("div");
-    wrapper.className = "tree-children";
-    node.after(wrapper);
-    await renderChildrenFromCache(item, wrapper, key); // 等本层渲染完成
-    await expandAfterRebuild(wrapper, openKeys);       // 再递归深层
-  }
-}
-async function renderChildrenFromCache(item, wrapper, key){
-  const ck = item.parserUrl;
-  const hit = dirCache.get(ck);
-  if(hit && Date.now() - hit.ts < DIR_TTL){
-    treeLoadedKeys.add(key);
-    renderTreeItems(hit.items, wrapper);
-    renderTreeSummary();
-    return;
-  }
-  wrapper.innerHTML = `<div class="tree-loading">加载子目录…</div>`;
-  wrapper.dataset.loading = "1";
-  await loadFolderChildren(item, wrapper, key);
-}
-
-async function toggleFolder(node, item){
-  const key = item.fileId || item.parserUrl;
-  node.classList.toggle("open");
-  let child = node.nextElementSibling;
-  if(child && child.classList.contains("tree-children")){
-    if(node.classList.contains("open")){
-      child.style.display = "flex";
-      if(!treeLoadedKeys.has(key) && !child.dataset.loading){
-        child.dataset.loading = "1";
-        const ck = item.parserUrl;
-        const hit = dirCache.get(ck);
-        if(hit && Date.now() - hit.ts < DIR_TTL){
-          treeLoadedKeys.add(key);
-          renderTreeItems(hit.items, child);
-          renderTreeSummary();
-        }else{
-          await loadFolderChildren(item, child, key);
-        }
-      }
-    }else{
-      child.style.display = "none";
-    }
-    return;
-  }
-  if(!node.classList.contains("open")) return;
-  const wrapper = document.createElement("div");
-  wrapper.className = "tree-children";
-  wrapper.innerHTML = `<div class="tree-loading">加载子目录…</div>`;
-  node.after(wrapper);
-  await loadFolderChildren(item, wrapper, key);
-}
-
 async function fetchDirItems(item, opts){
   opts = opts || {};
   const cacheKey = item.parserUrl || "";
