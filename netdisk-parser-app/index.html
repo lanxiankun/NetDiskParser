@@ -209,11 +209,11 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 .tree-detail .tree-item{padding:12px 14px}
 .tree-detail .tree-item .t-name{font-size:14px}
 .tree-detail .tree-item .t-sub{font-size:12px;margin-top:3px}
-.nav-breadcrumb{display:flex;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.nav-breadcrumb{display:flex;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .nav-breadcrumb::-webkit-scrollbar{display:none}
-.nav-crumb{color:var(--sky);cursor:pointer;padding:1px 4px;border-radius:5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nav-crumb.cur{color:var(--text);font-weight:650;cursor:default}
-.nav-sep{color:var(--text-3)}
+.nav-crumb{flex:0 0 auto;color:var(--sky);cursor:pointer;padding:1px 4px;border-radius:5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-crumb.cur{flex:0 0 auto;color:var(--text);font-weight:650;cursor:default}
+.nav-sep{flex:0 0 auto;color:var(--text-3)}
 .nav-content{display:flex;flex-direction:column;gap:6px}
 
 /* ===== 表单（设置） ===== */
