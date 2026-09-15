@@ -4,7 +4,7 @@ Android 网盘解析下载 App：粘贴分享链接 → 自动识别网盘与提
 
 ## 架构
 
-- **Android 壳**：Java 原生（WebView 容器 + 前台保活服务 + FileProvider）
+- **Android 壳**：Java 原生（前台保活服务 + FileProvider）
 - **核心服务**：Go 语言编译为 `.so`（本地 HTTP 服务 + 解析接口转发 + 下载代理），经 JNI 启动
 - **下载引擎**：内置 Gopeed（Go 开源下载器，以库形式集成，负责分片并发下载）
 - **界面**：原生 HTML/CSS/JS（单文件 `index.html`，WebView 加载本地服务渲染）
@@ -44,10 +44,3 @@ Android 打包要点：
 - 命令行打包（aapt2 / javac / d8 / zipalign / apksigner），不使用 Gradle
 - d8 限制：禁用匿名内部类（Java 8 lambda 会 NPE），必须用静态嵌套类
 
-## 功能
-
-- 整段文本识别网盘链接 + 提取码（支持 123 / 夸克 / UC / 蓝奏 / 奶牛 / 超星等）
-- 读取剪贴板、目录文件树批量下载
-- 任务管理（暂停 / 继续 / 删除，删除同步删本地文件）
-- 解析历史、通知栏进度、会话日志
-- 已完成任务打开 / 安装（APK 走系统安装器）
