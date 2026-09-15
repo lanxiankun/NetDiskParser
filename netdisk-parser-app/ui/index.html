@@ -1502,7 +1502,7 @@ async function downloadToGopeed(r){
   const pan = resolvePan(r.panType, "", r.directLink || r.parserUrl || "");
   const headers = antiHotlinkHeader(pan, r.otherParam);
   try{
-    const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam), r.fileInfo?.fileName, headers);
+    const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam, headers, pan === "uc" ? false : undefined), r.fileInfo?.fileName, headers, pan);
     toast("已发送到 Gopeed，任务 #" + id.slice(0, 8), "ok");
     setTimeout(() => navigate("downloads"), 700);
   }catch(err){
@@ -1515,20 +1515,43 @@ async function downloadToGopeed(r){
   }
 }
 
-async function gopeedCreateTask(url, name, headers){
+/** 请求头规范化：Referer/User-Agent/Cookie 只保留单一键，避免 Go Header 出现重复值被源站拒绝 */
+function normalizeHeaders(h){
+  const out = {};
+  if(!h) return out;
+  const pick = (keys) => { for(const k of keys){ if(h[k]) return h[k]; } return ""; };
+  const ref = pick(["referer","Referer","REFERER"]);
+  const ua  = pick(["user-agent","User-Agent","USER-AGENT"]);
+  const ck  = pick(["cookie","Cookie","COOKIE"]);
+  if(ref) out["Referer"] = ref;
+  if(ua)  out["User-Agent"] = ua;
+  if(ck)  out["Cookie"] = ck;
+  for(const k in h){
+    if(/^(referer|user-agent|cookie)$/i.test(k)) continue;
+    if(h[k]) out[k] = h[k];
+  }
+  return out;
+}
+
+async function gopeedCreateTask(url, name, headers, pan){
+  const th = settings.threads || 4;
+  // UC/夸克 OSS 直链带回调验证（checkplay），高并发分片会触发回调风暴被拒/挂起，单独限流
+  let conn = th;
+  if(pan === "uc") conn = Math.min(th, 4);
+  else if(pan === "qk") conn = Math.min(th, 8);
   const body = {
     req: {
       url,
       extra: {
         method: "",
-        header: headers || {},
+        header: normalizeHeaders(headers || {}),
         body: "",
       },
     },
     opts: {
       name: name || "",
       path: "",
-      extra: { connections: settings.threads || 4 },
+      extra: { connections: conn },
     },
   };
   return await gopeedFetch("/api/v1/tasks", { method: "POST", body });
@@ -1676,7 +1699,7 @@ async function batchDownloadSelected(){
       try{
         const pan = resolvePan(it.panType, currentTree.panType, it.parserUrl || "");
         const t = await buildDownloadTarget(it.parserUrl, pan, currentTree.otherParam);
-        await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct), it.fileName, t.headers);
+        await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), it.fileName, t.headers, pan);
         ok++;
       }catch(e){ fail++; }
     }
@@ -1696,7 +1719,7 @@ async function downloadFileItem(item){
   const pan = resolvePan(item.panType, currentTree.panType, item.parserUrl || "");
   try{
     const t = await buildDownloadTarget(item.parserUrl, pan, currentTree.otherParam);
-    await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct), item.fileName, t.headers);
+    await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), item.fileName, t.headers, pan);
     toast("已发送到 Gopeed", "ok");
     setTimeout(() => navigate("downloads"), 600);
   }catch(err){

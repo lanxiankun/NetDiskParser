@@ -567,6 +567,12 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rangeHdr := r.Header.Get("Range")
+	// UC/夸克 OSS 直链带 before-execute 回调（checkplay）：空 Range 的探测请求会被回调侧拒绝，
+	// 导致 Gopeed 拿不到文件大小直接判定失败。探测请求补 Range: bytes=0-0（Gopeed 通过
+	// Content-Range 的 /total 识别真实大小），下载分片本身带 Range 不受影响。
+	if rangeHdr == "" && (strings.Contains(target, "pds.uc.cn") || strings.Contains(target, "pds.quark.cn")) {
+		rangeHdr = "bytes=0-0"
+	}
 	var cookies []*http.Cookie
 	cur := target
 	base, _ := url.Parse(target)
