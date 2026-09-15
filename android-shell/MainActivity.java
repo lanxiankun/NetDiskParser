@@ -4,6 +4,9 @@ import android.Manifest;
 import android.app.Activity;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import android.content.ClipData;
@@ -11,6 +14,9 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -89,6 +95,7 @@ public class MainActivity extends Activity {
                 WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
         }
         Log.i(TAG, "onCreate: 开始启动内置服务");
+        registerNetworkMonitor();
         ensureStoragePermission();
         requestNotifyPermission();
         startKeepAlive();
@@ -129,6 +136,82 @@ public class MainActivity extends Activity {
 
         // 等待本地服务器就绪后加载界面
         new RetryLoadThread(this).start();
+    }
+
+    // ── 网络状态监听：切换网络/断开/恢复等关键事件写入会话日志（/logs 可查看）──
+    static String lastNetType = "";
+    private void registerNetworkMonitor(){
+        try{
+            final ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if(cm == null || Build.VERSION.SDK_INT < 24) return;
+            lastNetType = currentNetType(cm);
+            postNetLog("网络监听启动，当前网络: " + lastNetType);
+            cm.registerDefaultNetworkCallback(new NetMonitorCallback(cm));
+        }catch(Throwable t){
+            Log.w(TAG, "网络监听注册失败: " + t);
+        }
+    }
+
+    static String currentNetType(ConnectivityManager cm){
+        try{
+            Network n = cm.getActiveNetwork();
+            if(n == null) return "无网络";
+            NetworkCapabilities caps = cm.getNetworkCapabilities(n);
+            if(caps != null) return describeNetwork(caps);
+        }catch(Throwable ignored){}
+        return "未知";
+    }
+
+    static String describeNetwork(NetworkCapabilities caps){
+        if(caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return "WiFi";
+        if(caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "移动网络";
+        if(caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "有线";
+        if(caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return "VPN";
+        return "其他";
+    }
+
+    /** 网络事件写入会话日志（经 Go 侧 /app/pylog?tag=网络）；Go 服务未就绪时降级 Logcat */
+    static void postNetLog(String msg){
+        try{
+            new Thread(new NetLogRunnable(msg)).start();
+        }catch(Throwable ignored){}
+    }
+
+    static class NetMonitorCallback extends ConnectivityManager.NetworkCallback {
+        final ConnectivityManager cm;
+        NetMonitorCallback(ConnectivityManager cm){ this.cm = cm; }
+        @Override public void onAvailable(Network n){
+            postNetLog("网络已连接: " + currentNetType(cm));
+        }
+        @Override public void onLost(Network n){
+            postNetLog("网络断开");
+        }
+        @Override public void onCapabilitiesChanged(Network n, NetworkCapabilities caps){
+            String type = describeNetwork(caps);
+            String last = lastNetType;
+            if(!type.equals(last)){
+                lastNetType = type;
+                postNetLog("网络切换: " + (last.isEmpty() ? "无" : last) + " → " + type);
+            }
+        }
+    }
+
+    static class NetLogRunnable implements Runnable {
+        final String msg;
+        NetLogRunnable(String msg){ this.msg = msg; }
+        @Override public void run(){
+            try{
+                URL u = new URL("http://127.0.0.1:18090/app/pylog?tag="
+                        + URLEncoder.encode("网络", "UTF-8")
+                        + "&msg=" + URLEncoder.encode(msg, "UTF-8"));
+                HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                c.setConnectTimeout(800);
+                c.setReadTimeout(800);
+                c.getInputStream().close();
+            }catch(Throwable t){
+                Log.i(TAG, "[网络日志] " + msg + "（Go 服务未就绪，降级 Logcat）");
+            }
+        }
     }
 
     // 申请公共下载目录写权限：

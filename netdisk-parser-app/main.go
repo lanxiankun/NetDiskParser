@@ -258,8 +258,12 @@ func runServer(dataDir string) error {
 			return
 		}
 		msg := r.URL.Query().Get("msg")
+		tag := r.URL.Query().Get("tag")
+		if tag == "" {
+			tag = "节点" // 兼容 Java 节点日志
+		}
 		if msg != "" {
-			appLog("节点: %s", msg)
+			appLog("%s: %s", tag, msg)
 		}
 		w.WriteHeader(http.StatusOK)
 	})
