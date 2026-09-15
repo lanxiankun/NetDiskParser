@@ -1295,6 +1295,7 @@ async function handleParse(){
       };
       treeLoadedKeys = new Set();
       treeLoadedKeys.add("root");
+      logOp("第一层目录: " + fileList.length + " 项 - " + fileList.map(it => (it.fileName || "")).slice(0, 10).join(", "));
       renderTree(fileList, $("#resultArea"));
       currentLinkDetail = linkInfo;
       renderShareDetail();
@@ -1587,9 +1588,12 @@ async function renderTree(items, container){
 
 function renderTreeItems(items, list){
   list.innerHTML = "";
+  const seenIds = new Set();
   for(const item of items){
-    const isFolder = (item.fileType || "").toLowerCase() === "folder";
     const idKey = item.fileId || item.parserUrl;
+    if(idKey && seenIds.has(idKey)) continue; // 服务端可能返回重复项，按 id 去重
+    if(idKey) seenIds.add(idKey);
+    const isFolder = (item.fileType || "").toLowerCase() === "folder";
     const node = document.createElement("div");
     node.className = "tree-item" + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
     const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
@@ -1687,8 +1691,17 @@ async function loadFolderChildren(item, wrapper, key){
       wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
       return;
     }
+    // 过滤：父级已在顶层渲染的项（服务端可能返回完整路径导致重复显示）
+    const topIds = new Set((currentTree && Array.isArray(currentTree.items))
+      ? currentTree.items.map(it => it.fileId || it.parserUrl).filter(Boolean) : []);
+    const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
+    if(!filtered.length){
+      treeLoadedKeys.add(key);
+      wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
+      return;
+    }
     treeLoadedKeys.add(key);
-    renderTreeItems(list, wrapper);
+    renderTreeItems(filtered, wrapper);
     renderTreeSummary();
   }catch(e){
     logOp("目录加载异常: " + (e && e.message));
