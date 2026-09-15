@@ -51,6 +51,17 @@ var quarkCookie string // 夸克 Cookie（设置页保存，下载代理自动�
 
 var logMu sync.Mutex
 
+// tzLoc 日志用本地时区：Android 上 Go 读不到系统时区会回退 UTC，
+// 由 Java 侧在 JNI 启动时把设备时区偏移传入（setTzOffset），强制用设备本地时间
+var tzLoc = time.Local
+
+// setTzOffset 设置日志时区偏移（秒）。offset 为设备时区相对 UTC 的偏移秒数
+func setTzOffset(offsetSec int) {
+	if offsetSec != 0 {
+		tzLoc = time.FixedZone("Local", offsetSec)
+	}
+}
+
 // writeLogFile 把一条日志追加写入当前会话日志文件
 func writeLogFile(level, msg string) {
 	if appLogPath == "" {
@@ -58,7 +69,7 @@ func writeLogFile(level, msg string) {
 	}
 	logMu.Lock()
 	defer logMu.Unlock()
-	line := fmt.Sprintf("%s [%s] %s\n", time.Now().Format("2006-01-02 15:04:05"), level, msg)
+	line := fmt.Sprintf("%s [%s] %s\n", time.Now().In(tzLoc).Format("2006-01-02 15:04:05"), level, msg)
 	f, err := os.OpenFile(appLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
@@ -144,8 +155,8 @@ func runServer(dataDir string) error {
 		}
 	}
 	if err := os.MkdirAll(logDir, 0o755); err == nil {
-		// 每次启动创建新会话日志：logs/2006-01-02_15-04-05.log
-		appLogPath = filepath.Join(logDir, time.Now().Format("2006-01-02_15-04-05")+".log")
+		// 每次启动创建新会话日志：logs/2006-01-02_15-04-05.log（本地时区）
+		appLogPath = filepath.Join(logDir, time.Now().In(tzLoc).Format("2006-01-02_15-04-05")+".log")
 		cleanupOldLogs(logDir)
 	}
 	appLog("数据目录: %s", appDir)

@@ -29,8 +29,10 @@ import (
 )
 
 //export Java_com_netdisk_parser_MainActivity_StartServer
-func Java_com_netdisk_parser_MainActivity_StartServer(env *C.JNIEnv, clazz C.jobject, dir C.jstring) {
-	appLog("JNI StartServer 被调用")
+func Java_com_netdisk_parser_MainActivity_StartServer(env *C.JNIEnv, clazz C.jobject, dir C.jstring, tz C.jint) {
+	// 设备时区偏移（毫秒）→ 秒；Android 上 Go 读不到系统时区会回退 UTC，这里强制用设备本地时区
+	setTzOffset(int(tz) / 1000)
+	appLog("JNI StartServer 被调用 tzOffsetMillis=%d", int(tz))
 	dataDir := ""
 	if unsafe.Pointer(dir) != nil {
 		cstr := C.jstring_to_c(env, dir)
