@@ -1589,11 +1589,19 @@ async function renderTree(items, container){
 function renderTreeItems(items, list){
   list.innerHTML = "";
   const seenIds = new Set();
+  const seenFolderNames = new Set();
   for(const item of items){
     const idKey = item.fileId || item.parserUrl;
-    if(idKey && seenIds.has(idKey)) continue; // 服务端可能返回重复项，按 id 去重
-    if(idKey) seenIds.add(idKey);
     const isFolder = (item.fileType || "").toLowerCase() === "folder";
+    // 去重：目录按文件名（服务端可能返回重复目录，如同名 movie 两行）；文件按 id
+    if(isFolder){
+      const nm = (item.fileName || "").trim();
+      if(nm && seenFolderNames.has(nm)) continue;
+      if(nm) seenFolderNames.add(nm);
+    }else if(idKey && seenIds.has(idKey)){
+      continue;
+    }
+    if(idKey) seenIds.add(idKey);
     const node = document.createElement("div");
     node.className = "tree-item" + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
     const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
