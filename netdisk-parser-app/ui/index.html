@@ -1829,8 +1829,9 @@ async function refreshTasks(){
     }
     return;
   }
-  // 更新速度历史
+  // 更新速度历史（仅活跃任务：静止任务波形数据不变，drawWaves 零重绘）
   tasks.forEach(t => {
+    if(t.status !== "running") return;
     const id = t.id;
     if(!speedHistories[id]) speedHistories[id] = [];
     const arr = speedHistories[id];
@@ -1885,9 +1886,69 @@ function renderTasks(){
     if(btn) btn.addEventListener("click", () => navigate("parse"));
     return;
   }
-  area.innerHTML = "";
+  // 增量更新：已存在卡片只更新字段，新增才建卡片，消失才移除（canvas 保留，波形不闪）
   const sorted = [...tasks].sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
-  sorted.forEach(t => area.appendChild(renderTaskCard(t)));
+  const existing = new Map();
+  area.querySelectorAll(".task-card").forEach(c => existing.set(c.dataset.id, c));
+  const seen = new Set();
+  sorted.forEach(t => {
+    seen.add(t.id);
+    const card = existing.get(t.id);
+    if(card) updateTaskCard(card, t);
+    else area.appendChild(renderTaskCard(t));
+  });
+  existing.forEach((card, id) => { if(!seen.has(id)) card.remove(); });
+}
+
+/** 增量更新已有任务卡片：状态变化才动徽章/按钮，进度/速度每次实时更新 */
+function updateTaskCard(card, t){
+  const id = t.id;
+  const [cls, label] = statusMeta(t.status);
+  const total = t.meta?.res?.size || 0;
+  const done = t.progress?.downloaded || 0;
+  const speed = t.progress?.speed || 0;
+  const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+  const eta = speed > 0 && total > done ? Math.ceil((total - done) / speed * 1000) : 0;
+  // 状态变化：更新徽章/进度条样式/操作按钮
+  if(card.dataset.status !== t.status){
+    card.dataset.status = t.status;
+    const badge = card.querySelector(".badge");
+    if(badge){ badge.className = "badge " + cls; badge.textContent = label; }
+    const pbar = card.querySelector(".pbar");
+    if(pbar) pbar.className = "pbar" + (cls === "error" ? " error" : cls === "pause" ? " pause" : "");
+    const ops = card.querySelector(".task-ops");
+    if(ops){
+      ops.innerHTML = "";
+      const opsHtml =
+        (t.status === "done" ? `<button class="op-btn" data-op="open" title="打开/安装">${ICONS.open}</button>` : "") +
+        (t.status === "running" || t.status === "wait" ? `<button class="op-btn" data-op="pause" title="暂停">${ICONS.pause}</button>` : "") +
+        (t.status === "pause" || t.status === "error" ? `<button class="op-btn" data-op="resume" title="继续">${ICONS.resume}</button>` : "") +
+        `<button class="op-btn danger" data-op="delete" title="删除">${ICONS.trash}</button>`;
+      ops.innerHTML = opsHtml;
+      ops.querySelectorAll("[data-op]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if(btn.dataset.op === "open") openTaskFile(id);
+          else taskOp(id, btn.dataset.op);
+        });
+      });
+    }
+  }
+  // 进度条/百分比：实时
+  const bar = card.querySelector(".pbar > div");
+  if(bar) bar.style.width = (t.status === "done" ? 100 : pct) + "%";
+  const pspans = card.querySelectorAll(".task-progress-row span");
+  if(pspans.length >= 2){
+    pspans[0].textContent = fmtSize(done) + " / " + (total > 0 ? fmtSize(total) : "未知");
+    pspans[1].textContent = t.status === "done" ? "100%" : pct + "%";
+  }
+  // 速度/剩余时间：实时
+  const stats = card.querySelector(".task-stats");
+  if(stats){
+    stats.innerHTML =
+      `<span>${escapeHtml(fmtSpeed(speed))}</span>` +
+      (eta ? `<span>剩余 ${fmtDuration(eta)}</span>` : "") +
+      `<span>${escapeHtml(fmtTime(t.createdAt))}</span>`;
+  }
 }
 
 function renderTaskCard(t){
@@ -2037,6 +2098,9 @@ function drawWaves(){
     const id = card.dataset.id;
     const arr = speedHistories[id] || [];
     const task = tasks.find(t => t.id === id);
+    const key = (task?.status || "") + ":" + arr.length + ":" + (arr[arr.length-1] || 0);
+    if(canvas.dataset.key === key) return; // 数据未变：不重绘（静止任务零开销，不闪）
+    canvas.dataset.key = key;
     const ctx = canvas.getContext("2d");
     const w = canvas.width;
     const h = canvas.height;
@@ -2254,7 +2318,7 @@ function startPolling(){
   const tick = async () => {
     await refreshTasks();
     active = tasks.some(t => ["running","wait","ready"].includes(t.status));
-    schedule(active ? 3000 : 30000);
+    schedule(active ? 1000 : 30000);
   };
   function schedule(ms){ pollTimer = setTimeout(tick, ms); }
   schedule(active ? 3000 : 30000);
@@ -2398,13 +2462,14 @@ function init(){
   setTimeout(() => refreshGopeedStatus(true), 400);
   setGreet();
   syncParseBtn();
-  // 波形绘制循环（节流）：仅下载页且前台时绘制，后台/其他页零开销
+  // 波形绘制循环（节流）：仅下载页且前台时绘制，后台/其他页零开销；
+  // 数据未变的任务（已完成/暂停/出错）不重绘 → 波形不闪、静止零开销
   setInterval(() => {
     if(document.hidden) return;
     const r = (location.hash.replace(/^#\/?/, "") || "parse");
     if(r !== "downloads") return;
     drawWaves();
-  }, 300);
+  }, 500);
 }
 
 init();
