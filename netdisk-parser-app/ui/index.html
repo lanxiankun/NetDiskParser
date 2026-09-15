@@ -640,6 +640,16 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
             </div>
           </div>
         </div>
+        <div class="field" id="nodeProxyRow" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <label>节点代理</label>
+            <p class="field-tip" style="margin-top:2px">内置 dnode 节点 · 123 网盘提速（实验）</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="nodeProxyStatus" style="font-size:12px;color:#8a94a6;max-width:150px;text-align:right;white-space:pre-line"></span>
+            <div class="switch" id="nodeProxyToggle" role="switch" aria-checked="false"><span class="knob"></span></div>
+          </div>
+        </div>
         <p class="set-note">下载引擎已内置在本程序中，随 App 启动运行，无需单独安装。下载目录填写本机绝对路径，保存后立即生效。</p>
       </div>
 
@@ -2072,6 +2082,42 @@ async function fillSettingsForm(){
   $("#setApiKey").value = settings.apiKey || "";
   $("#setThreads").value = settings.threads || 16;
   $("#setMaxRunning").value = settings.maxRunning || 5;
+  // 节点代理开关（Android 专属：经 Java bridge 启停内置 dnode 节点；桌面无 bridge 则隐藏）
+  const npRow = $("#nodeProxyRow");
+  if(npRow){
+    if(window.AndroidBridge){
+      let npOn = false;
+      try{ npOn = AndroidBridge.getNodeProxy() === true; }catch(e){}
+      const sw = $("#nodeProxyToggle");
+      sw.classList.toggle("on", npOn);
+      sw.setAttribute("aria-checked", npOn ? "true" : "false");
+      sw.addEventListener("click", () => {
+        const next = !sw.classList.contains("on");
+        sw.classList.toggle("on", next);
+        sw.setAttribute("aria-checked", next ? "true" : "false");
+        try{
+          AndroidBridge.setNodeProxy(next);
+          toast(next ? "节点代理已开启（123 下载走节点）" : "节点代理已关闭（恢复直连）", "ok");
+        }catch(e){ toast("节点切换失败: " + e, "err"); }
+      });
+      // 节点实时状态（/app/node-status 读 dnode_status.json）
+      async function refreshNodeStatus(){
+        try{
+          const r = await fetch("/app/node-status");
+          const d = await r.json();
+          const el = $("#nodeProxyStatus");
+          if(el && d && d.status){
+            el.textContent = (d.status || "") + (d.ts ? "\n" + d.ts : "");
+            el.style.color = (d.status || "").indexOf("已连接") >= 0 ? "#10b981" : "#8a94a6";
+          }
+        }catch(e){}
+      }
+      setInterval(refreshNodeStatus, 3000);
+      refreshNodeStatus();
+    }else{
+      npRow.style.display = "none";
+    }
+  }
   // 下载目录从内置引擎读取（持久化于后端），读不到时回退本地
   let dir = settings.dlDir || "";
   try{

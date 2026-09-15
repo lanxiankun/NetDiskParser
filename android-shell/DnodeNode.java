@@ -63,16 +63,34 @@ public class DnodeNode {
 
     private static final String WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+    // ── 实例/线程引用（供 stop 使用）──
+    private static volatile Thread supervisorThread;
+    private static volatile boolean stopped = false;
+    static volatile DnodeNode current;
+
     // ── 启动入口（保持与 DnodeBridge.start 相同签名，MainActivity 零改动）──
     public static void start(Context ctx) {
         final Context app = ctx.getApplicationContext();
+        stopped = false;
         startStatusPoller(app);
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
             @Override public void run() {
                 NodeSupervisor sv = new NodeSupervisor(app);
                 sv.loop();
             }
-        }).start();
+        });
+        supervisorThread = t;
+        t.start();
+    }
+
+    /** 停止节点（下载配置开关关闭时调用）：置停止标志 + 打断监控线程，节点实例下次循环退出 */
+    public static void stop() {
+        stopped = true;
+        DnodeNode n = current;
+        if (n != null) n.running = false;
+        Thread t = supervisorThread;
+        if (t != null) t.interrupt();
+        try { logStatus(n != null ? n.app : null, "已停止（开关关闭）"); } catch (Throwable ignored) {}
     }
 
     // ══════════════════════════════════════════════════════
@@ -145,6 +163,7 @@ public class DnodeNode {
         gt.setDaemon(true);
         gt.start();
         Log.i(TAG, "节点配置 server=" + serverUrl + " node_id=" + nodeId);
+        logStatus(app, "配置 server=" + serverUrl + " node_id=" + shortId(nodeId));
     }
 
     void runLoop() {
@@ -175,7 +194,7 @@ public class DnodeNode {
         lastPong = System.currentTimeMillis();
         Log.i(TAG, "✅ 已连接 node_id=" + shortId(nodeId));
         writeStatus("已连接 node_id=" + shortId(nodeId));
-        logStatus(app, "节点: 已连接 node_id=" + shortId(nodeId));
+        logStatus(app, "已连接 node_id=" + shortId(nodeId));
 
         Thread ping = new Thread(new PingTask(this));
         ping.setDaemon(true);
@@ -193,13 +212,14 @@ public class DnodeNode {
             tunnels.clear();
             ws = null;
             writeStatus("连接断开，等待重连…");
-            logStatus(app, "节点: 连接断开，等待重连…");
+            logStatus(app, "连接断开，等待重连…");
         }
     }
 
     void handleFrame(WssClient.Frame f) {
         if (f.opcode == 0x8) {          // close
             Log.i(TAG, "服务端关闭连接");
+            logStatus(app, "服务端关闭连接");
             closeWs();
         } else if (f.opcode == 0x9) {   // ping → pong
             try { ws.sendFrame(0xA, f.payload); } catch (Exception ignored) {}
@@ -229,6 +249,7 @@ public class DnodeNode {
             int port = ((payload[1 + hl] & 0xff) << 8) | (payload[2 + hl] & 0xff);
             totalTunnels++;
             Log.i(TAG, "新隧道 → " + host + ":" + port + "  active=" + (tunnels.size() + 1) + "/" + MAX_CONCURRENCY);
+            logStatus(app, "服务端派发隧道 → " + host + ":" + port + "  active=" + (tunnels.size() + 1) + "/" + MAX_CONCURRENCY);
             if (!sem.tryAcquire()) {
                 try { sendFrame(tid, TYPE_CONNECT_FAIL, "busy".getBytes()); } catch (Exception ignored) {}
                 return;
@@ -295,6 +316,7 @@ public class DnodeNode {
                 tcp = s;
                 owner.sendFrame(tid, TYPE_CONNECT_OK, new byte[0]);
                 Log.d(TAG, "隧道 " + host + ":" + port + " TCP_CONNECTED");
+                DnodeNode.logStatus(owner.app, "隧道已建立 → " + host + ":" + port);
                 reader = new Thread(new TcpToWs(this, s));
                 reader.setDaemon(true);
                 reader.start();
@@ -302,6 +324,7 @@ public class DnodeNode {
                 try { reader.join(); } catch (InterruptedException ignored) {}
             } catch (Throwable e) {
                 if (!closed) {
+                    DnodeNode.logStatus(owner.app, "隧道连接失败 → " + host + ":" + port + " " + e);
                     try { owner.sendFrame(tid, TYPE_CONNECT_FAIL, String.valueOf(e).getBytes()); } catch (Exception ignored) {}
                 }
             } finally {
@@ -373,7 +396,7 @@ public class DnodeNode {
                 if (owner.lastPong > 0 && System.currentTimeMillis() - owner.lastPong > PONG_TIMEOUT_MS) {
                     Log.w(TAG, "超过 " + (PONG_TIMEOUT_MS / 1000) + "s 无 pong，连接僵死，主动关闭");
                     owner.writeStatus("连接僵死，主动重连中…");
-                    owner.logStatus(owner.app, "节点: 连接僵死，主动重连中…");
+                    owner.logStatus(owner.app, "连接僵死，主动重连中…");
                     owner.closeWs();
                     return;
                 }
@@ -653,7 +676,7 @@ public class DnodeNode {
         try {
             JSONObject o = new JSONObject();
             o.put("status", msg);
-            o.put("ts", System.currentTimeMillis() / 1000.0);
+            o.put("ts", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()));
             FileOutputStream fos = new FileOutputStream(new File(filesDir, "dnode_status.json"));
             fos.write(o.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             fos.close();
@@ -732,7 +755,7 @@ public class DnodeNode {
                                     String status = content.substring(a + 1, b);
                                     if (!status.equals(last)) {
                                         last = status;
-                                        logStatus(app, "节点: " + status);
+                                        logStatus(app, status);
                                     }
                                 }
                             }

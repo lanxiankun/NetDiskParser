@@ -259,7 +259,7 @@ func runServer(dataDir string) error {
 		}
 		msg := r.URL.Query().Get("msg")
 		if msg != "" {
-			appLog("py节点: %s", msg)
+			appLog("节点: %s", msg)
 		}
 		w.WriteHeader(http.StatusOK)
 	})

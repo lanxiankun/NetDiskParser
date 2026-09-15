@@ -101,8 +101,10 @@ public class MainActivity extends Activity {
             // Go 运行时启动失败时继续，由重试逻辑兜底
         }
 
-        // 内置 dnode 节点已停用（回退到直连下载：不再启动 Java 节点，恢复无代理行为）
-        // DnodeBridge.start(this);
+        // 节点代理（下载配置开关）：开启过则恢复启动内置 dnode 节点，否则保持直连
+        if (getSharedPreferences("ndp", MODE_PRIVATE).getBoolean("node_proxy", false)) {
+            DnodeBridge.start(this);
+        }
 
         webView = new WebView(this);
         WebSettings s = webView.getSettings();
@@ -238,6 +240,26 @@ public class MainActivity extends Activity {
                 Log.w(TAG, "读取剪贴板失败: " + t);
             }
             return "";
+        }
+
+        /** 节点代理开关（下载配置）：启停内置 dnode 节点，状态持久化；返回 ok */
+        @JavascriptInterface
+        public void setNodeProxy(boolean enable) {
+            activity.getSharedPreferences("ndp", MODE_PRIVATE)
+                    .edit().putBoolean("node_proxy", enable).apply();
+            try {
+                if (enable) DnodeBridge.start(activity);
+                else DnodeNode.stop();
+                Log.i(TAG, "节点代理开关: " + (enable ? "开" : "关"));
+            } catch (Throwable t) {
+                Log.w(TAG, "节点启停失败: " + t);
+            }
+        }
+
+        @JavascriptInterface
+        public boolean getNodeProxy() {
+            return activity.getSharedPreferences("ndp", MODE_PRIVATE)
+                    .getBoolean("node_proxy", false);
         }
 
         /** 打开/安装已下载文件：content:// FileProvider 授权给外部应用，返回 ok / needInstallPermission / err:xxx */
