@@ -2116,7 +2116,7 @@ async function fillSettingsForm(){
           }
         }catch(e){}
       }
-      setInterval(refreshNodeStatus, 3000);
+      setInterval(refreshNodeStatus, 10000);
       refreshNodeStatus();
     }else{
       npRow.style.display = "none";
@@ -2250,9 +2250,14 @@ function applyRoute(){
 }
 function startPolling(){
   if(pollTimer) return;
-  pollTimer = setInterval(() => {
-    refreshTasks();
-  }, 3000);
+  let active = true;
+  const tick = async () => {
+    await refreshTasks();
+    active = tasks.some(t => ["running","wait","ready"].includes(t.status));
+    schedule(active ? 3000 : 30000);
+  };
+  function schedule(ms){ pollTimer = setTimeout(tick, ms); }
+  schedule(active ? 3000 : 30000);
 }
 function stopPolling(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
@@ -2393,8 +2398,13 @@ function init(){
   setTimeout(() => refreshGopeedStatus(true), 400);
   setGreet();
   syncParseBtn();
-  // 波形绘制循环（节流）
-  setInterval(drawWaves, 300);
+  // 波形绘制循环（节流）：仅下载页且前台时绘制，后台/其他页零开销
+  setInterval(() => {
+    if(document.hidden) return;
+    const r = (location.hash.replace(/^#\/?/, "") || "parse");
+    if(r !== "downloads") return;
+    drawWaves();
+  }, 300);
 }
 
 init();
