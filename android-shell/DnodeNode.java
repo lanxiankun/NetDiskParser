@@ -69,28 +69,39 @@ public class DnodeNode {
     static volatile DnodeNode current;
 
     // ── 启动入口（保持与 DnodeBridge.start 相同签名，MainActivity 零改动）──
+    private static final Object START_LOCK = new Object();
     public static void start(Context ctx) {
         final Context app = ctx.getApplicationContext();
-        stopped = false;
-        startStatusPoller(app);
-        Thread t = new Thread(new Runnable() {
-            @Override public void run() {
-                NodeSupervisor sv = new NodeSupervisor(app);
-                sv.loop();
-            }
-        });
-        supervisorThread = t;
-        t.start();
+        synchronized (START_LOCK) {
+            Thread cur = supervisorThread;
+            if (cur != null && cur.isAlive()) return; // 已在运行，忽略重复启动（防多实例/多连接冲突）
+            stopped = false;
+            startStatusPoller(app);
+            Thread t = new Thread(new Runnable() {
+                @Override public void run() {
+                    NodeSupervisor sv = new NodeSupervisor(app);
+                    sv.loop();
+                }
+            });
+            supervisorThread = t;
+            t.start();
+        }
     }
 
     /** 停止节点（下载配置开关关闭时调用）：置停止标志 + 打断监控线程，节点实例下次循环退出 */
     public static void stop() {
-        stopped = true;
-        DnodeNode n = current;
-        if (n != null) n.running = false;
-        Thread t = supervisorThread;
-        if (t != null) t.interrupt();
-        try { logStatus(n != null ? n.app : null, "已停止（开关关闭）"); } catch (Throwable ignored) {}
+        synchronized (START_LOCK) {
+            stopped = true;
+            DnodeNode n = current;
+            if (n != null) n.running = false;
+            Thread t = supervisorThread;
+            if (t != null) {
+                t.interrupt();
+                try { t.join(3000); } catch (InterruptedException ignored) {}
+            }
+            supervisorThread = null;
+            try { logStatus(n != null ? n.app : null, "已停止（开关关闭）"); } catch (Throwable ignored) {}
+        }
     }
 
     // ══════════════════════════════════════════════════════
@@ -102,15 +113,17 @@ public class DnodeNode {
         void loop() {
             logStatus(app, "Java 节点：初始化…");
             int attempt = 1;
-            while (true) {
+            while (!stopped) {
                 try {
                     NodeRunner r = new NodeRunner(app);
                     Thread t = new Thread(r);
                     t.start();
                     t.join();
+                    if (stopped) break;
                     logStatus(app, "节点退出，60 秒后自动重启");
                     Thread.sleep(60000);
                 } catch (Throwable t) {
+                    if (stopped) break;
                     logStatus(app, "节点异常(第" + attempt + "次): " + t);
                     try { Thread.sleep(30000L * Math.min(attempt, 3)); } catch (InterruptedException e) { break; }
                 }
@@ -172,16 +185,19 @@ public class DnodeNode {
         while (running) {
             try {
                 connectOnce();
-                attempt = 0;
+                if (!running) break;
+                // 连接正常结束（含服务端主动关闭）：同样退避重连，避免 0s 快循环风暴
+                // （服务端对同一 node_id 限单连接时，无退避会形成连上即关的刷屏循环）
             } catch (Throwable e) {
                 if (!running) break;
-                int d = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
-                if (d > 0) {
-                    logStatus(app, "连接断开，" + (d / 1000) + "s 后重连…");
-                    try { Thread.sleep(d); } catch (InterruptedException ie) { break; }
-                }
-                attempt++;
+                // 网络异常：按退避表递增
             }
+            int d = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
+            if (d > 0) {
+                logStatus(app, "连接断开，" + (d / 1000) + "s 后重连…");
+                try { Thread.sleep(d); } catch (InterruptedException ie) { break; }
+            }
+            attempt++;
         }
     }
 
