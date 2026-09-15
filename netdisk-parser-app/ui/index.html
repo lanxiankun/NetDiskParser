@@ -1887,6 +1887,9 @@ function renderTasks(){
     return;
   }
   // 增量更新：已存在卡片只更新字段，新增才建卡片，消失才移除（canvas 保留，波形不闪）
+  // 先清除占位（空提示/引擎异常/检测中），避免与任务卡片并存
+  const ph = area.querySelector(":scope > .card:not(.task-card)");
+  if(ph) ph.remove();
   const sorted = [...tasks].sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
   const existing = new Map();
   area.querySelectorAll(".task-card").forEach(c => existing.set(c.dataset.id, c));
