@@ -1656,7 +1656,7 @@ async function toggleFolder(node, item){
 }
 
 async function loadFolderChildren(item, wrapper, key){
-  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 50));
+  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
   try{
     // parserUrl 为 189.qaiu.top 的目录接口地址（如 /v2/getFileList?url=…），转本地代理访问
     // 服务端生成的 parserUrl 通常不带 token，需与顶层目录一样补上 API Key，否则接口 500/401
@@ -1670,6 +1670,11 @@ async function loadFolderChildren(item, wrapper, key){
     // 2) 补分享密码：带密码的链接（如 123 盘），pwd 需作为独立参数，嵌在 url 参数内服务端不识别
     if(currentTree && currentTree.rootPwd && !u.searchParams.has("pwd")){
       local += "&pwd=" + encodeURIComponent(currentTree.rootPwd);
+    }
+    // 3) 补目录标识：parserUrl 的 url 参数是分享根链接，子目录必须带 fileId 才能定位到当前目录，
+    //    否则服务端返回根层列表（顶层+子层看起来"目录显示两次"）
+    if(item.fileId && !u.searchParams.has("fileId") && !u.searchParams.has("pid") && !u.searchParams.has("dirId")){
+      local += "&fileId=" + encodeURIComponent(item.fileId);
     }
     const resp = await fetch(local);
     const text = await resp.text().catch(() => "");
@@ -1704,11 +1709,13 @@ async function loadFolderChildren(item, wrapper, key){
       ? currentTree.items.map(it => it.fileId || it.parserUrl).filter(Boolean) : []);
     const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
     if(!filtered.length){
+      logOp("目录加载: 原始 " + list.length + " 项全为顶层重复(父目录混入)，按空处理 " + (item.fileId || ""));
       treeLoadedKeys.add(key);
       wrapper.innerHTML = `<div class="tree-empty">空目录</div>`;
       return;
     }
     treeLoadedKeys.add(key);
+    logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", "));
     renderTreeItems(filtered, wrapper);
     renderTreeSummary();
   }catch(e){
