@@ -1655,7 +1655,7 @@ async function toggleFolder(node, item){
   await loadFolderChildren(item, wrapper, key);
 }
 
-async function loadFolderChildren(item, wrapper, key){
+async function loadFolderChildren(item, wrapper, key, opts){
   logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
   const dirId = item.fileId || "";
   try{
@@ -1715,9 +1715,16 @@ async function loadFolderChildren(item, wrapper, key){
           const id = it.fileId || it.parserUrl;
           return id && idParam && String(id) === String(idParam);
         });
+        if(selfItems.length && !(opts && opts.deep >= 3)){
+          // 123 网盘先返回"当前目录自身"作为入口（无真实内容），需用其 parserUrl 再次请求才返回真实子项——自动深入
+          const deepItem = selfItems[0];
+          logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
+          return await loadFolderChildren(deepItem, wrapper, key, {deep: ((opts && opts.deep) || 0) + 1});
+        }
         if(selfItems.length){
+          // 深入到底仍是自身：渲染自身项兜底（保留可点入入口）
           treeLoadedKeys.add(key);
-          logOp("目录返回: 仅当前目录自身(可继续进入) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
+          logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
           renderTreeItems(selfItems, wrapper);
           renderTreeSummary();
           return;
