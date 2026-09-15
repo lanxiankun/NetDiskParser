@@ -504,8 +504,27 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 	if hdrRaw := r.URL.Query().Get("hdr"); hdrRaw != "" {
 		var hdr map[string]string
 		if json.Unmarshal([]byte(hdrRaw), &hdr) == nil {
+			// Referer/User-Agent/Cookie 只保留一个权威值：解析服务返回的小写键优先
+			// （downloadHeaders），防 Go map 遍历随机导致 Referer 被错误的默认值覆盖
+			// （如 UC 回调校验 Referer=fast.uc.cn，发成 pan.uc.cn 会被 checkplay 拒绝 403）
+			if v, ok := hdr["referer"]; ok && v != "" {
+				headers["Referer"] = v
+			} else if v, ok := hdr["Referer"]; ok && v != "" {
+				headers["Referer"] = v
+			}
+			if v, ok := hdr["user-agent"]; ok && v != "" {
+				headers["User-Agent"] = v
+			} else if v, ok := hdr["User-Agent"]; ok && v != "" {
+				headers["User-Agent"] = v
+			}
+			if v, ok := hdr["cookie"]; ok && v != "" {
+				headers["Cookie"] = v
+			} else if v, ok := hdr["Cookie"]; ok && v != "" {
+				headers["Cookie"] = v
+			}
 			for k, v := range hdr {
-				if v == "" {
+				if v == "" || strings.EqualFold(k, "referer") ||
+					strings.EqualFold(k, "user-agent") || strings.EqualFold(k, "cookie") {
 					continue
 				}
 				headers[k] = v
@@ -567,12 +586,6 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rangeHdr := r.Header.Get("Range")
-	// UC/夸克 OSS 直链带 before-execute 回调（checkplay）：空 Range 的探测请求会被回调侧拒绝，
-	// 导致 Gopeed 拿不到文件大小直接判定失败。探测请求补 Range: bytes=0-0（Gopeed 通过
-	// Content-Range 的 /total 识别真实大小），下载分片本身带 Range 不受影响。
-	if rangeHdr == "" && (strings.Contains(target, "pds.uc.cn") || strings.Contains(target, "pds.quark.cn")) {
-		rangeHdr = "bytes=0-0"
-	}
 	var cookies []*http.Cookie
 	cur := target
 	base, _ := url.Parse(target)

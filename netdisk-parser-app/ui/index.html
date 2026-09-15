@@ -2208,7 +2208,7 @@ function dlUrl(url, pan, otherParam, headers, direct){
   const cookie = currentDownloadCookie(otherParam);
   if(cookie) u += "&cookie=" + encodeURIComponent(cookie);
   if(headers && Object.keys(headers).length){
-    u += "&hdr=" + encodeURIComponent(JSON.stringify(headers));
+    u += "&hdr=" + encodeURIComponent(JSON.stringify(normalizeHeaders(headers)));
   }
   return u;
 }
