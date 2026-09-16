@@ -71,13 +71,6 @@ Android 打包要点：
 - 命令行打包（aapt2 / javac / d8 / zipalign / apksigner），不使用 Gradle
 - d8 限制：禁用匿名内部类（Java 8 lambda 会 NPE），必须用静态嵌套类
 
-## Releases
-
-每个版本发布为 GitHub Release（tag `vX.Y.Z`），安装包以资产形式附在 Release 页面：
-
-- App1：`NetDiskParser-android-arm64-v2.0.37.apk`
-- App2：`NetDiskParser2-android-arm64-v1.0.5.apk`
-
 ## 分享文件夹功能（App1 v2.0.37+）
 
 设置中填写解析站 API Key 后，解析页点「分享文件夹」按钮，即可把当前分享链接生成目录分享页：
