@@ -24,20 +24,19 @@ Android 网盘解析下载工具，仓库包含两个独立 App：
 
 ## 目录结构
 
-```
-netdisk-parser-app/   # App1 云盘解析下载器：Go 主服务 + 前端 UI + 安装包
-  ui/index.html       #   前端（单文件）
-  dist/               #   v2.0.37 安装包
-netdisk-parser2/      # App2 网盘直链下载：Go 主服务 + 前端 UI + Android 壳 + 安装包
-  ui/index.html       #   前端（单文件）
-  android-shell/      #   Android 壳（Java 源码 + 打包脚本）
-  dist/               #   v1.0.5 安装包
-android-shell/        # App1 的 Android 壳（Java 源码 + 资源 + 打包脚本）
-gopeed-src/           # Gopeed v1.9.3 源码（go.mod replace 引用）
-vendor-patch/         # anet 补丁库（Android 编译依赖）
-legacy/               # 历史版本存档（android-native、早期 netdisk-parser）
-```
+两个 App 各自独立成目录，均自带 Android 壳与构建依赖（gopeed-src / vendor-patch），互不依赖：
 
+```
+netdisk-parser-app/   # App1 云盘解析下载器（完整自包含）
+  android-shell/      #   Android 壳（Java 源码 + 资源 + 打包脚本）
+  gopeed-src/         #   Gopeed v1.9.3 源码（go.mod replace 引用）
+  vendor-patch/       #   anet 补丁库（Android 编译依赖）
+  ui/index.html       #   前端（单文件，//go:embed 打进 so）
+  dist/               #   v2.0.37 安装包
+netdisk-parser2/      # App2 网盘直链下载（完整自包含，结构同上）
+  android-shell/  gopeed-src/  vendor-patch/  ui/  dist/
+legacy/               # 历史版本存档（android-native 早期版）
+```
 ## 构建
 
 依赖：Go 1.24+、Android NDK 25、Android SDK build-tools 34、JDK 21
@@ -45,7 +44,7 @@ legacy/               # 历史版本存档（android-native、早期 netdisk-par
 ### App1（云盘解析下载器）Android APK
 
 ```bash
-cd android-shell
+cd netdisk-parser-app/android-shell
 bash build_merged.sh   # 输出 ../dist/NetDiskParser-android-arm64.apk
 ```
 

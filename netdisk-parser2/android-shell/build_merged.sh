@@ -8,7 +8,7 @@ export PATH=/home/user/Doubao/chats/38441058725195778/go/bin:/home/user/Doubao/c
 export GOTOOLCHAIN=local
 export BT=$ANDROID_HOME/build-tools/34.0.0
 export PLATFORM=$ANDROID_HOME/platforms/android-34/android.jar
-ROOT=/home/user/Doubao/chats/38441058725195778/netdisk-parser2
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
 cd $ROOT
 GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=$CLANG CXX=$CLANGPP go build -trimpath -ldflags="-checklinkname=0 -s -w -extld=$CLANGPP -extldflags=-static-libstdc++" -buildmode=c-shared -o libnetdiskparser.so .
@@ -33,9 +33,9 @@ echo "[4/8] javac OK"
 $BT/d8 --release --lib $PLATFORM --output build/ $(find build/classes -name '*.class')
 echo "[5/8] d8 OK"
 
-python3 <<'PYEOF'
+ROOT="$ROOT" python3 <<'PYEOF'
 import zipfile, shutil, os
-root = "/home/user/Doubao/chats/38441058725195778/netdisk-parser2/android-shell"
+root = os.environ["ROOT"] + "/android-shell"
 src = root + "/build/app-unsigned.apk"
 out = root + "/build/app-packed.apk"
 

@@ -158,6 +158,6 @@ require (
 	zombiezen.com/go/sqlite v1.4.2 // indirect
 )
 
-replace github.com/GopeedLab/gopeed => ../gopeed-src/github.com/GopeedLab/gopeed@v1.9.3
+replace github.com/GopeedLab/gopeed => ./gopeed-src/github.com/GopeedLab/gopeed@v1.9.3
 
-replace github.com/wlynxg/anet => ../vendor-patch/anet
+replace github.com/wlynxg/anet => ./vendor-patch/anet
