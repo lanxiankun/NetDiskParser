@@ -965,7 +965,10 @@ async function createDirShare(){
       // 主题显示第一层目录名（未解析过则回退默认标题）
       let title = "目录分享已生成";
       if(currentTree && Array.isArray(currentTree.items)){
-        const fd = currentTree.items.find(it => (it.fileType || "").toLowerCase() === "dir");
+        const fd = currentTree.items.find(it => {
+          const t = (it.fileType || "").toLowerCase();
+          return t === "folder" || t === "dir";
+        });
         if(fd && (fd.fileName || fd.name)) title = fd.fileName || fd.name;
       }
       const tEl = $("#dirShareTitle");
