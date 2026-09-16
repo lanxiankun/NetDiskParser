@@ -965,6 +965,17 @@ function gopeedBase(){
   return "";
 }
 
+/** 网盘类型码 → 中文名（解析站 /dir/ 目录分享返回 type 字段） */
+const PAN_TYPE_LABELS = {
+  qk: "夸克网盘", uc: "UC网盘", ye: "123网盘", p139: "移动云盘", p189: "天翼云盘",
+  lz: "蓝奏云", bd: "百度网盘", al: "阿里云盘", ty: "天翼云盘", lt: "联通云盘",
+  yd: "移动云盘", qq: "腾讯微云", xl: "迅雷云盘", h11: "Huang1111", "115": "115网盘"
+};
+function panLabel(t){
+  const k = String(t || "").toLowerCase();
+  return PAN_TYPE_LABELS[k] || t || "网盘";
+}
+
 /** 解析网盘类型：优先文件项自带 panType → 目录/顶层 panType → API 路径里的网盘标识（兜底） */
 function resolvePan(itemPan, treePan, url){
   if(itemPan) return itemPan;
@@ -1273,7 +1284,7 @@ async function handleParse(){
       currentTree = {
         rootUrl: raw, rootPwd: "",
         panType: data.type || "ye",
-        panName: "直链",
+        panName: panLabel(data.type),
         otherParam: null,
         items: fileList,
         selected: new Map(),
@@ -1286,7 +1297,7 @@ async function handleParse(){
       currentLinkDetail = null;
       renderShareDetail();
       const firstDir = fileList.find(it => (it.fileType || "").toLowerCase() === "folder") || fileList[0];
-      addHistory({url: raw, pwd: "", name: (firstDir && firstDir.fileName) || "目录分享", mode: "dir", panName: "直链"});
+      addHistory({url: raw, pwd: "", name: (firstDir && firstDir.fileName) || "目录分享", mode: "dir", panName: panLabel(data.type)});
     }catch(err){
       toast(err.message || "解析失败", "err");
     }
