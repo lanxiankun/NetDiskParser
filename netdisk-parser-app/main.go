@@ -473,9 +473,11 @@ const defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 // buildDownloadHeaders 根据目标地址里的网盘标识生成防盗链请求头
 func buildDownloadHeaders(target, uaOverride string) map[string]string {
 	h := map[string]string{}
-	m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target)
 	pan := ""
-	if len(m) > 1 {
+	// 目录分享直链：/v2/directoryShare/redirectUrl/{shareCode}/{diskType}/{fileId}
+	if m := regexp.MustCompile(`/directoryShare/redirectUrl/([a-z0-9]+)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 2 {
+		pan = m[2]
+	} else if m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 1 {
 		pan = m[1]
 	}
 	// 123 网盘直链域名识别（downloadUrl 为 cjjd19.com 等，不走 /parser 标识）
@@ -559,7 +561,9 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	panTag := "未知"
-	if m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 1 {
+	if m := regexp.MustCompile(`/directoryShare/redirectUrl/([a-z0-9]+)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 2 {
+		panTag = m[2]
+	} else if m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 1 {
 		panTag = m[1]
 	} else if strings.Contains(target, "pds.quark.cn") {
 		panTag = "qk"

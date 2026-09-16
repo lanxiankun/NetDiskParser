@@ -2517,6 +2517,12 @@ async function apiGetFileDownInfo(pan, param, sign){
 /** 从 parserUrl 提取网盘标识与下载参数（/v2/redirectUrl/{type}/{param}、/d/{type}/{key} 等） */
 /** 从 parserUrl 提取网盘/文件参数，并附带链接自带签名 apiKeySign（免 API Key 换取权威直链） */
 function extractDownInfo(url){
+  // 目录分享直链：/v2/directoryShare/redirectUrl/{shareCode}/{diskType}/{fileId}
+  const m1 = (url || "").match(/\/(?:directoryShare\/redirectUrl|redirectUrl)\/([^\/?]+)\/([^\/?]+)\/([^\/?]+)/i);
+  if(m1){
+    const sign = (url.match(/[?&]apiKeySign=([^&]+)/) || [])[1] || "";
+    return { pan: m1[2], param: m1[3], sign };
+  }
   const m = (url || "").match(/\/(?:redirectUrl|d|f|json|parser)\/([a-z0-9]+)\/([^\/?]+)/i);
   if(!m) return null;
   const sign = (url.match(/[?&]apiKeySign=([^&]+)/) || [])[1] || "";
