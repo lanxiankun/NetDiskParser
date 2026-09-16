@@ -961,10 +961,17 @@ async function createDirShare(){
     const resp = await fetch(api);
     const j = await resp.json().catch(() => null);
     const d = j && j.data ? j.data : j;
+    const urlEl = $("#dirShareUrl");
+    const tEl = $("#dirShareTitle");
     if(d && d.url){
-      $("#dirShareUrl").textContent = d.url;
-      // 主题显示第一层目录名（未解析过则回退默认标题）
-      let title = "目录分享已生成";
+      // 打开弹窗前重置内容，避免残留上一次
+      if(urlEl) urlEl.textContent = d.url;
+      if(tEl) tEl.textContent = "目录分享已生成";
+      $("#dirShareModal").style.display = "flex";
+      logOp("目录分享生成: " + d.url);
+      toast("目录分享页已生成", "ok");
+      // 主题：优先用已解析的第一层目录名
+      let title = "";
       if(currentTree && Array.isArray(currentTree.items)){
         const fd = currentTree.items.find(it => {
           const t = (it.fileType || "").toLowerCase();
@@ -972,30 +979,36 @@ async function createDirShare(){
         });
         if(fd && (fd.fileName || fd.name)) title = fd.fileName || fd.name;
       }
-      const tEl = $("#dirShareTitle");
-      if(tEl) tEl.textContent = title;
-      $("#dirShareModal").style.display = "flex";
-      logOp("目录分享生成: " + d.url);
-      toast("目录分享页已生成", "ok");
-      // 未解析过时：后台读取生成的 /dir/ 目录，取第一层目录名做主题
-      if(!title){
-        apiGetFileList(d.url, "").then(list => {
-          if(!tEl) return;
-          const fd = (list || []).find(it => {
-            const t = (it.fileType || "").toLowerCase();
-            return t === "folder" || t === "dir";
-          });
-          if(fd && (fd.fileName || fd.name)) tEl.textContent = fd.fileName || fd.name;
-        }).catch(() => {});
+      if(title){
+        if(tEl) tEl.textContent = title;
+      }else{
+        // 未解析过：读 /v2/directoryShare/{code}（免额度）取第一层目录名
+        const code = String(d.url).split("/").filter(Boolean).pop();
+        if(code){
+          fetch(PARSER_BASE + "/v2/directoryShare/" + encodeURIComponent(code))
+            .then(r => r.json().catch(() => null))
+            .then(jj => {
+              if(!tEl) return;
+              const list = (jj && (jj.fileList || (jj.data && jj.data.fileList))) || [];
+              const fd = list.find(it => {
+                const t = (it.fileType || "").toLowerCase();
+                return t === "folder" || t === "dir";
+              });
+              if(fd && (fd.fileName || fd.name)) tEl.textContent = fd.fileName || fd.name;
+            })
+            .catch(() => {});
+        }
       }
     }else{
       const msg = (j && j.msg) || "分享文件夹失败";
       toast(msg, "err");
       logOp("分享文件夹失败: " + msg);
+      $("#dirShareModal").style.display = "none";
     }
   }catch(e){
     toast("分享文件夹失败：" + e.message, "err");
     logOp("分享文件夹异常: " + e.message);
+    $("#dirShareModal").style.display = "none";
   }finally{
     syncParseBtn();
   }
