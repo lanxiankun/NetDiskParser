@@ -1335,6 +1335,7 @@ async function handleParse(){
       treeLoadedKeys = new Set();
       treeLoadedKeys.add("root");
       logOp("第一层目录: " + fileList.length + " 项 - " + fileList.map(it => (it.fileName || "")).slice(0, 10).join(", "));
+      prefetchVisibleDirs(fileList); // 点击解析即开始后台多线程预取目录（链式覆盖下一层）
       renderTree(fileList, $("#resultArea"));
       currentLinkDetail = linkInfo;
       renderShareDetail();
@@ -1780,11 +1781,22 @@ function goNavTo(i){
   currentTree.navPath.length = i + 1;
   renderNavView();
 }
+// 同一目录的并发请求去重：进行中复用，避免重复请求占隧道（点击+预取只发一次）
+const dirInflight = new Map(); // cacheKey -> Promise
 async function fetchDirItems(item, opts){
   opts = opts || {};
   const cacheKey = item.parserUrl || "";
   const cacheHit = dirCache.get(cacheKey);
   if(cacheHit && Date.now() - cacheHit.ts < DIR_TTL) return cacheHit.items;
+  const inflight = dirInflight.get(cacheKey);
+  if(inflight) return inflight; // 已有请求在进行，直接复用结果
+  const p = doFetchDirItems(item, opts);
+  dirInflight.set(cacheKey, p);
+  try{ return await p; }finally{ dirInflight.delete(cacheKey); }
+}
+
+async function doFetchDirItems(item, opts){
+  const cacheKey = item.parserUrl || "";
   const dirId = item.fileId || "";
   try{
     const u = new URL(item.parserUrl);
@@ -1849,6 +1861,11 @@ async function fetchDirItems(item, opts){
         });
         if(selfItems.length && !(opts.deep >= 3)){
           const deepItem = selfItems[0];
+          // 防御：自身项 parserUrl 与当前相同则不再递归（避免自引用），兜底返回
+          if(deepItem.parserUrl === cacheKey){
+            dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
+            return selfItems;
+          }
           if(!opts.silent) logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
           const deepItems = await fetchDirItems(deepItem, {deep: (opts.deep || 0) + 1});
           if(deepItems && deepItems.length) dirCache.set(cacheKey, {items: deepItems, ts: Date.now()});
@@ -1875,30 +1892,52 @@ async function fetchDirItems(item, opts){
   }
 }
 
-// 后台预取当前目录前 N 个文件夹内容（静默、并发 3 路），用户点击时命中 dirCache 秒开
+// 后台预取队列池（并发 3 路、链式）：解析完成/渲染目录后把可见文件夹入队，
+// 预取成功自动把其子目录也入队（提前覆盖下一层），用户点击时命中 dirCache 秒开
 let prefetchSeq = 0;
 const prefetchJobs = new Map(); // parserUrl -> Promise（点击目录时可直接等待它完成）
-async function prefetchVisibleDirs(items){
+const prefetchPool = [];        // 待预取队列 {d, seq}
+let poolWorkers = 0;
+function prefetchVisibleDirs(items){
   const seq = ++prefetchSeq;
   const dirs = (items || []).filter(it =>
     (it.fileType || "").toLowerCase() === "folder"
   ).slice(0, 8);
-  if(!dirs.length) return;
-  let i = 0;
-  const worker = async () => {
-    while(i < dirs.length && seq === prefetchSeq){
-      const d = dirs[i++];
+  for(const d of dirs) enqueuePrefetch(d, seq);
+}
+function enqueuePrefetch(d, seq){
+  const ck = d.parserUrl || "";
+  if(prefetchJobs.has(ck)) return;           // 正在预取
+  const hit = dirCache.get(ck);
+  if(hit && Date.now() - hit.ts < DIR_TTL) return; // 已有缓存
+  prefetchPool.push({d, seq});
+  kickPrefetchWorker();
+}
+async function kickPrefetchWorker(){
+  if(poolWorkers >= 3) return; // 并发 3 路
+  poolWorkers++;
+  try{
+    while(prefetchPool.length){
+      const {d, seq} = prefetchPool.shift();
+      if(seq !== prefetchSeq) continue; // 已切换目录，丢弃旧队列任务
       const ck = d.parserUrl || "";
       try{
         const hit = dirCache.get(ck);
         if(hit && Date.now() - hit.ts < DIR_TTL) continue;
         const p = fetchDirItems(d, {deep: 1, silent: true}).catch(() => null);
         prefetchJobs.set(ck, p);
-        try{ await p; }finally{ prefetchJobs.delete(ck); }
+        let items2 = null;
+        try{ items2 = await p; }finally{ prefetchJobs.delete(ck); }
+        // 链式：该文件夹预取成功后，把其子目录也入队（提前覆盖下一层，限前 3 个）
+        if(items2 && seq === prefetchSeq){
+          items2.filter(it => (it.fileType || "").toLowerCase() === "folder").slice(0, 3)
+            .forEach(sd => enqueuePrefetch(sd, seq));
+        }
       }catch(e){ /* 预取失败静默 */ }
     }
-  };
-  await Promise.all([worker(), worker(), worker()]); // 并发 3 路
+  }finally{
+    poolWorkers--;
+  }
 }
 
 async function loadFolderChildren(item, wrapper, key, opts){
