@@ -1902,7 +1902,7 @@ function prefetchVisibleDirs(items){
   const seq = ++prefetchSeq;
   const dirs = (items || []).filter(it =>
     (it.fileType || "").toLowerCase() === "folder"
-  ).slice(0, 8);
+  ).slice(0, 12);
   for(const d of dirs) enqueuePrefetch(d, seq);
 }
 function enqueuePrefetch(d, seq){
@@ -1914,7 +1914,7 @@ function enqueuePrefetch(d, seq){
   kickPrefetchWorker();
 }
 async function kickPrefetchWorker(){
-  if(poolWorkers >= 3) return; // 并发 3 路
+  if(poolWorkers >= 5) return; // 并发 5 路（多线程预取，隧道上限 50 余量充足）
   poolWorkers++;
   try{
     while(prefetchPool.length){
@@ -1928,9 +1928,9 @@ async function kickPrefetchWorker(){
         prefetchJobs.set(ck, p);
         let items2 = null;
         try{ items2 = await p; }finally{ prefetchJobs.delete(ck); }
-        // 链式：该文件夹预取成功后，把其子目录也入队（提前覆盖下一层，限前 3 个）
+        // 链式：该文件夹预取成功后，把其子目录也入队（提前覆盖下一层，限前 5 个）
         if(items2 && seq === prefetchSeq){
-          items2.filter(it => (it.fileType || "").toLowerCase() === "folder").slice(0, 3)
+          items2.filter(it => (it.fileType || "").toLowerCase() === "folder").slice(0, 5)
             .forEach(sd => enqueuePrefetch(sd, seq));
         }
       }catch(e){ /* 预取失败静默 */ }
