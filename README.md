@@ -36,20 +36,11 @@ android-shell/        # App1 的 Android 壳（Java 源码 + 资源 + 打包脚�
 gopeed-src/           # Gopeed v1.9.3 源码（go.mod replace 引用）
 vendor-patch/         # anet 补丁库（Android 编译依赖）
 legacy/               # 历史版本存档（android-native、早期 netdisk-parser）
-netdisk-parser-win-java/  # 桌面版 Java 实现（Windows 端）
 ```
 
 ## 构建
 
 依赖：Go 1.24+、Android NDK 25、Android SDK build-tools 34、JDK 21
-
-### 桌面版（Windows / macOS / Linux）
-
-```bash
-cd netdisk-parser-app   # 或 netdisk-parser2
-go build -o NetDiskParser .
-./NetDiskParser
-```
 
 ### App1（云盘解析下载器）Android APK
 
