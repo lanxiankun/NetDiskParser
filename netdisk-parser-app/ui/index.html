@@ -368,6 +368,15 @@ details.fold .detail{margin-top:11px;padding-top:11px;border-top:1px dashed var(
   padding:12px 14px;border-bottom:1px solid var(--border-soft);font-size:14px;
 }
 .modal-head .btns{display:flex;gap:8px}
+.ds-link-row{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px;font-family:ui-monospace,Consolas,monospace;font-size:13px;
+  word-break:break-all;user-select:text;display:flex;align-items:flex-start;gap:6px;
+  cursor:pointer;
+}
+.ds-link-row:active{background:var(--accent-dim)}
+.ds-link-label{color:var(--text-dim,#8a94a6);flex:none}
+.ds-link-url{color:var(--accent)}
 .logs-pre{
   margin:0;padding:12px 14px;overflow:auto;flex:1;
   font-family:var(--mono);font-size:11px;line-height:1.65;
@@ -683,7 +692,7 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
         <div class="field" id="nodeProxyRow" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
           <div>
             <label>节点代理</label>
-            <p class="field-tip" style="margin-top:2px">内置 dnode 节点 · 123 网盘提速（实验）</p>
+
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <span id="nodeProxyStatus" style="font-size:12px;color:#8a94a6;max-width:150px;text-align:right;white-space:pre-line"></span>
@@ -775,9 +784,9 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
       </div>
     </div>
     <div class="modal-body">
-      <p class="field-hint">分享链接（任何人可打开浏览目录并下载）：</p>
-      <div class="ds-link-box" id="dirShareUrl"></div>
-      <button class="btn btn-primary btn-sm" id="dirShareCopy">复制链接</button>
+      <div class="ds-link-row" id="dirShareRow" title="点击复制">
+        <span class="ds-link-label">链接：</span><span class="ds-link-url" id="dirShareUrl"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -2750,10 +2759,11 @@ function bindEvents(){
   $("#parseBtn").addEventListener("click", handleParse);
   $("#dirShareBtn").addEventListener("click", createDirShare);
   $("#dirShareClose").addEventListener("click", () => { $("#dirShareModal").style.display = "none"; });
-  $("#dirShareCopy").addEventListener("click", () => {
+  const dsRow = $("#dirShareRow");
+  if(dsRow) dsRow.addEventListener("click", () => {
     const url = $("#dirShareUrl").textContent;
     if(url){
-      navigator.clipboard.writeText(url).then(() => toast("已复制目录分享链接", "ok")).catch(() => {});
+      navigator.clipboard.writeText(url).then(() => toast("已复制链接", "ok")).catch(() => {});
     }
   });
   $("#dirShareModal").addEventListener("click", e => { if(e.target === $("#dirShareModal")) $("#dirShareModal").style.display = "none"; });
