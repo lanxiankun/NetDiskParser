@@ -135,7 +135,8 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
   background:var(--surface-2);color:var(--text);border:1px solid var(--border);
   transition:all .18s;
 }
-.btn-ghost2:active{transform:scale(.97)}
+.btn-ghost2:active:not(:disabled){transform:scale(.97)}
+.btn-ghost2:disabled{background:var(--surface-2);color:#9aa1ab;opacity:.55;cursor:not-allowed;box-shadow:none}
 .btn-ghost2 svg{width:16px;height:16px;stroke:currentColor}
 .btn-primary2{
   flex:2.2;display:flex;align-items:center;justify-content:center;gap:6px;
@@ -976,6 +977,17 @@ async function createDirShare(){
       $("#dirShareModal").style.display = "flex";
       logOp("目录分享生成: " + d.url);
       toast("目录分享页已生成", "ok");
+      // 未解析过时：后台读取生成的 /dir/ 目录，取第一层目录名做主题
+      if(!title){
+        apiGetFileList(d.url, "").then(list => {
+          if(!tEl) return;
+          const fd = (list || []).find(it => {
+            const t = (it.fileType || "").toLowerCase();
+            return t === "folder" || t === "dir";
+          });
+          if(fd && (fd.fileName || fd.name)) tEl.textContent = fd.fileName || fd.name;
+        }).catch(() => {});
+      }
     }else{
       const msg = (j && j.msg) || "分享文件夹失败";
       toast(msg, "err");
@@ -2171,6 +2183,7 @@ function renderHistory(){
       $("#shareUrl").value = h.url;
       $("#sharePwd").value = h.pwd || "";
       syncUrlWrap();
+      syncParseBtn();
       navigate("parse");
       handleParse();
     });
