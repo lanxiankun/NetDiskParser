@@ -40,9 +40,10 @@ const (
 )
 
 type appConfig struct {
-	DownloadDir string `json:"downloadDir"`
-	QuarkCookie string `json:"quarkCookie,omitempty"`
-	ApiKey      string `json:"apiKey,omitempty"`
+	DownloadDir string           `json:"downloadDir"`
+	QuarkCookie string           `json:"quarkCookie,omitempty"`
+	ApiKey      string           `json:"apiKey,omitempty"`
+	History     []map[string]any `json:"history,omitempty"`
 }
 
 var gopeedPort int
@@ -720,7 +721,14 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 		// 会导致 Gopeed 判定不可分段而退化为单连接下载（速度受限）。源站实际支持 206，强制声明可让分片并发生效。
 		w.Header().Set("Accept-Ranges", "bytes")
 		w.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(w, resp.Body)
+		startCopy := time.Now()
+		n, _ := io.Copy(w, resp.Body)
+		elapsed := time.Since(startCopy)
+		rate := float64(0)
+		if elapsed > 0 {
+			rate = float64(n) / elapsed.Seconds() / 1024 / 1024
+		}
+		appLog("下载代理: 回传完成 %d 字节 / %s / %.1f MB/s", n, elapsed.Round(time.Millisecond), rate)
 		return
 	}
 	http.Error(w, "重定向次数过多", http.StatusBadGateway)
@@ -875,6 +883,18 @@ func appConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if v, ok := body["apiKey"].(string); ok {
 			old.ApiKey = v
+		}
+		if v, ok := body["history"].([]any); ok {
+			hist := []map[string]any{}
+			for _, it := range v {
+				if m, ok := it.(map[string]any); ok {
+					hist = append(hist, m)
+				}
+			}
+			if len(hist) > 20 {
+				hist = hist[:20]
+			}
+			old.History = hist
 		}
 		if old.DownloadDir == "" {
 			old.DownloadDir = defaultDownloadDir("")

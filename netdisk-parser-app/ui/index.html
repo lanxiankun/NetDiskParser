@@ -832,7 +832,7 @@ const LS_KEY = "netdisk_parser_v1";
 const defaultSettings = {
   apiKey: "",
   dlDir: "",
-  threads: 8,
+  threads: 64,
   maxRunning: 5,
 };
 let settings = loadSettings();
@@ -843,6 +843,8 @@ function loadSettings(){
     const raw = localStorage.getItem(LS_KEY);
     if(!raw) return {...defaultSettings};
     const s = JSON.parse(raw);
+    // 旧默认线程 8 → 统一升级为新默认 64（用户手动调过的大于 8 的值保留）
+    if(typeof s.threads === "number" && s.threads <= 8) s.threads = 64;
     return {...defaultSettings, ...s};
   }catch(e){ return {...defaultSettings}; }
 }
@@ -865,6 +867,14 @@ function loadHistory(){
 }
 function saveHistory(){
   localStorage.setItem(LS_KEY + "_history", JSON.stringify(history.slice(0, 20)));
+  // 双写：历史记录同步到 Go 侧配置（私有目录 app.json），App 退出/清后台后不丢
+  try{
+    fetch("/app/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ history: history.slice(0, 20) })
+    });
+  }catch(e){}
 }
 function addHistory(item){
   history = history.filter(h => h.url !== item.url);
@@ -2632,7 +2642,7 @@ function batchOp(op){
 /* ================= 设置 ================= */
 async function fillSettingsForm(){
   $("#setApiKey").value = settings.apiKey || "";
-  $("#setThreads").value = settings.threads || 16;
+  $("#setThreads").value = settings.threads || 64;
   $("#setMaxRunning").value = settings.maxRunning || 5;
   // 节点代理状态（Android 专属：节点默认常启，仅显示实时状态；桌面无 bridge 则隐藏）
   const npRow = $("#nodeProxyRow");
@@ -2980,6 +2990,11 @@ function init(){
     let changed = false;
     if(cfg.apiKey && !settings.apiKey){ settings.apiKey = cfg.apiKey; changed = true; }
     if(cfg.downloadDir && !settings.dlDir){ settings.dlDir = cfg.downloadDir; changed = true; }
+    if(Array.isArray(cfg.history) && cfg.history.length && (!history || !history.length)){
+      history = cfg.history;
+      saveHistory();
+      renderHistory();
+    }
     if(changed){
       localStorage.setItem(LS_KEY, JSON.stringify(settings));
       const k = $("#setApiKey"); if(k) k.value = settings.apiKey || "";
