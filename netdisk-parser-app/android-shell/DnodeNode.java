@@ -741,10 +741,27 @@ public class DnodeNode {
         }
     }
 
+    /** 读取 Go 服务随机端口（filesDir/server.port），未就绪返回 -1 */
+    static int readServerPort(String file) {
+        if (file == null || file.isEmpty()) return -1;
+        try {
+            java.io.File f = new java.io.File(file);
+            if (!f.exists()) return -1;
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            byte[] buf = new byte[16];
+            int n = in.read(buf);
+            in.close();
+            if (n > 0) return Integer.parseInt(new String(buf, 0, n).trim());
+        } catch (Throwable t) {}
+        return -1;
+    }
+
     /** 状态上报到会话日志（经 Go 侧 /app/pylog） */
     static void logStatus(Context ctx, String msg) {
         try {
-            URL u = new URL("http://127.0.0.1:18090/app/pylog?msg=" + URLEncoder.encode(msg, "UTF-8"));
+            int port = readServerPort(new java.io.File(ctx.getFilesDir(), "server.port").getAbsolutePath());
+            if (port <= 0) return;
+            URL u = new URL("http://127.0.0.1:" + port + "/app/pylog?msg=" + URLEncoder.encode(msg, "UTF-8"));
             HttpURLConnection c = (HttpURLConnection) u.openConnection();
             c.setConnectTimeout(2000);
             c.setReadTimeout(2000);

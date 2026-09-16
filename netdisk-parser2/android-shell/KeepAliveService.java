@@ -117,6 +117,21 @@ public class KeepAliveService extends Service {
         }
     }
 
+    /** 读取 Go 服务随机端口（filesDir/server.port），未就绪返回 -1 */
+    static int readServerPort(String file) {
+        if (file == null || file.isEmpty()) return -1;
+        try {
+            java.io.File f = new java.io.File(file);
+            if (!f.exists()) return -1;
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            byte[] buf = new byte[16];
+            int n = in.read(buf);
+            in.close();
+            if (n > 0) return Integer.parseInt(new String(buf, 0, n).trim());
+        } catch (Throwable t) {}
+        return -1;
+    }
+
     /** 子线程：请求内置 Gopeed 任务列表并计算进度 */
     private static class FetchRunnable implements Runnable {
         private final KeepAliveService svc;
@@ -127,7 +142,9 @@ public class KeepAliveService extends Service {
 
         @Override
         public void run() {
-            String body = httpGet("http://127.0.0.1:18091/api/v1/tasks");
+            int port = readServerPort(new java.io.File(svc.getFilesDir(), "server.port").getAbsolutePath());
+            if (port <= 0) return;
+            String body = httpGet("http://127.0.0.1:" + port + "/api/v1/tasks");
             if (body == null || body.length() == 0) {
                 return;
             }

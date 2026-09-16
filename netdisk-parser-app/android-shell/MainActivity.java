@@ -77,6 +77,8 @@ public class MainActivity extends Activity {
     }
 
     private WebView webView;
+    /** Go 服务随机端口文件（onCreate 时指向 filesDir/server.port） */
+    static volatile String portFile = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,6 +101,7 @@ public class MainActivity extends Activity {
                 WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
         }
         Log.i(TAG, "onCreate: 开始启动内置服务");
+        portFile = new java.io.File(getFilesDir(), "server.port").getAbsolutePath();
         registerNetworkMonitor();
         ensureStoragePermission();
         requestNotifyPermission();
@@ -178,7 +181,7 @@ public class MainActivity extends Activity {
     /** 网络事件写入会话日志（经 Go 侧 /app/pylog?tag=网络）；Go 服务未就绪时降级 Logcat */
     static void postNetLog(String msg){
         try{
-            new Thread(new NetLogRunnable(msg)).start();
+            new Thread(new NetLogRunnable(readServerPort(portFile), msg)).start();
         }catch(Throwable ignored){}
     }
 
@@ -202,11 +205,13 @@ public class MainActivity extends Activity {
     }
 
     static class NetLogRunnable implements Runnable {
+        final int port;
         final String msg;
-        NetLogRunnable(String msg){ this.msg = msg; }
+        NetLogRunnable(int port, String msg){ this.port = port; this.msg = msg; }
         @Override public void run(){
+            if (port <= 0) return;
             try{
-                URL u = new URL("http://127.0.0.1:18090/app/pylog?tag="
+                URL u = new URL("http://127.0.0.1:" + port + "/app/pylog?tag="
                         + URLEncoder.encode("网络", "UTF-8")
                         + "&msg=" + URLEncoder.encode(msg, "UTF-8"));
                 HttpURLConnection c = (HttpURLConnection) u.openConnection();
@@ -443,9 +448,10 @@ public class MainActivity extends Activity {
                 } catch (InterruptedException e) {
                     return;
                 }
-                if (canConnect()) {
+                int port = readServerPort(activity.portFile);
+                if (port > 0 && canConnect(port)) {
                     Log.i(TAG, "第 " + i + " 次探测: 本地服务已就绪，加载界面");
-                    activity.runOnUiThread(new UiLoad(activity));
+                    activity.runOnUiThread(new UiLoad(activity, port));
                     return;
                 }
                 if (i == 15 || i == 40) {
@@ -455,9 +461,9 @@ public class MainActivity extends Activity {
             Log.e(TAG, "60 次探测超时，本地服务始终未就绪");
         }
 
-        private boolean canConnect() {
+        private boolean canConnect(int port) {
             try {
-                java.net.Socket socket = new java.net.Socket("127.0.0.1", 18090);
+                java.net.Socket socket = new java.net.Socket("127.0.0.1", port);
                 socket.close();
                 return true;
             } catch (Exception e) {
@@ -468,15 +474,17 @@ public class MainActivity extends Activity {
 
     private static class UiLoad implements Runnable {
         private final MainActivity activity;
+        private final int port;
 
-        UiLoad(MainActivity activity) {
+        UiLoad(MainActivity activity, int port) {
             this.activity = activity;
+            this.port = port;
         }
 
         @Override
         public void run() {
-            Log.i(TAG, "加载 http://127.0.0.1:18090/");
-            activity.webView.loadUrl("http://127.0.0.1:18090/");
+            Log.i(TAG, "加载 http://127.0.0.1:" + port + "/");
+            activity.webView.loadUrl("http://127.0.0.1:" + port + "/");
         }
     }
 
@@ -549,6 +557,21 @@ public class MainActivity extends Activity {
                 Log.w(TAG, "目录回填失败: " + t);
             }
         }
+    }
+
+    /** 读取 Go 服务随机端口（filesDir/server.port），未就绪返回 -1 */
+    static int readServerPort(String file) {
+        if (file == null || file.isEmpty()) return -1;
+        try {
+            java.io.File f = new java.io.File(file);
+            if (!f.exists()) return -1;
+            java.io.FileInputStream in = new java.io.FileInputStream(f);
+            byte[] buf = new byte[16];
+            int n = in.read(buf);
+            in.close();
+            if (n > 0) return Integer.parseInt(new String(buf, 0, n).trim());
+        } catch (Throwable t) {}
+        return -1;
     }
 
     @Override

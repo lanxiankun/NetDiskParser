@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -334,15 +335,24 @@ func runServer(dataDir string) error {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
 
-	addr := fmt.Sprintf("127.0.0.1:%d", DefaultPort)
-	serverAddr = addr
-	srv := &http.Server{Addr: addr, Handler: mux}
+	// 随机端口绑定：避免与同机其他 App（如旧版云盘解析下载器）冲突
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return fmt.Errorf("监听本地端口失败: %w", err)
+	}
+	port = ln.Addr().(*net.TCPAddr).Port
+	serverAddr = fmt.Sprintf("127.0.0.1:%d", port)
+	// 端口写入 filesDir/server.port，供安卓壳读取后加载页面/上报日志
+	if err := os.WriteFile(filepath.Join(appDir, "server.port"), []byte(strconv.Itoa(port)), 0o644); err != nil {
+		appLogError("写入端口文件失败: %v", err)
+	}
+	srv := &http.Server{Addr: serverAddr, Handler: mux}
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			appLogError("主服务启动失败: %v", err)
 		}
 	}()
-	appLog("界面地址 http://%s", addr)
+	appLog("界面地址 http://%s", serverAddr)
 	return nil
 }
 
