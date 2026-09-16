@@ -778,7 +778,7 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
 <div id="dirShareModal" class="modal-mask" style="display:none">
   <div class="modal">
     <div class="modal-head">
-      <b>目录分享已生成</b>
+      <b id="dirShareTitle">目录分享已生成</b>
       <div class="btns">
         <button class="btn btn-ghost btn-sm" id="dirShareClose">关闭</button>
       </div>
@@ -962,6 +962,14 @@ async function createDirShare(){
     const d = j && j.data ? j.data : j;
     if(d && d.url){
       $("#dirShareUrl").textContent = d.url;
+      // 主题显示第一层目录名（未解析过则回退默认标题）
+      let title = "目录分享已生成";
+      if(currentTree && Array.isArray(currentTree.items)){
+        const fd = currentTree.items.find(it => (it.fileType || "").toLowerCase() === "dir");
+        if(fd && (fd.fileName || fd.name)) title = fd.fileName || fd.name;
+      }
+      const tEl = $("#dirShareTitle");
+      if(tEl) tEl.textContent = title;
       $("#dirShareModal").style.display = "flex";
       logOp("目录分享生成: " + d.url);
       toast("目录分享页已生成", "ok");
