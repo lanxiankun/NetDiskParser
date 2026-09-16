@@ -609,6 +609,10 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="parseIcon"><path d="M12 3v13"/><path d="m5 10 7 7 7-7"/></svg>
           <span id="parseBtnText">开始解析</span>
         </button>
+        <button class="btn-ghost2" id="dirShareBtn" disabled title="把当前分享链接生成目录分享页（/dir/xxx），需已填写解析 API Key">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>
+          分享文件夹
+        </button>
       </div>
     </div>
 
@@ -650,7 +654,7 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
             <input id="setApiKey" type="password" autocomplete="off" placeholder="注册后于用户面板获取">
           </div>
         </div>
-        <p class="set-note">解析每次消耗 1 次额度；目录列表与链接详情不消耗。Key 仅保存在本浏览器本地。</p>
+
       </div>
 
       <div class="set-group">
@@ -685,7 +689,6 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
             <span id="nodeProxyStatus" style="font-size:12px;color:#8a94a6;max-width:150px;text-align:right;white-space:pre-line"></span>
           </div>
         </div>
-        <p class="set-note">下载引擎已内置在本程序中，随 App 启动运行，无需单独安装。下载目录填写本机绝对路径，保存后立即生效。</p>
       </div>
 
       <div style="display:flex;gap:10px">
@@ -759,6 +762,23 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
       </div>
     </div>
     <pre id="logsContent" class="logs-pre">加载中…</pre>
+  </div>
+</div>
+
+<!-- 目录分享弹窗 -->
+<div id="dirShareModal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <b>目录分享已生成</b>
+      <div class="btns">
+        <button class="btn btn-ghost btn-sm" id="dirShareClose">关闭</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="field-hint">分享链接（任何人可打开浏览目录并下载）：</p>
+      <div class="ds-link-box" id="dirShareUrl"></div>
+      <button class="btn btn-primary btn-sm" id="dirShareCopy">复制链接</button>
+    </div>
   </div>
 </div>
 
@@ -906,6 +926,47 @@ function parseApiKey(){
     return null;
   }
   return key;
+}
+
+/** 分享文件夹：把当前分享链接生成目录分享页（/dir/xxx），需解析站 API Key */
+async function createDirShare(){
+  const key = parseApiKey();
+  if(!key) return;
+  const raw = $("#shareUrl").value.trim();
+  if(!raw){ toast("请先粘贴分享链接", "err"); return; }
+  const info = extractShareInfo(raw);
+  const url = (info && info.url) || raw;
+  let pwd = $("#sharePwd").value.trim();
+  if(!pwd && info && info.pwd) pwd = info.pwd;
+  if(!/^https?:\/\//i.test(url)){
+    toast("未识别到有效的网盘链接", "err");
+    return;
+  }
+  logOp("分享文件夹: " + url.slice(0, 80));
+  const btn = $("#dirShareBtn");
+  if(btn) btn.disabled = true;
+  try{
+    const api = PARSER_BASE + "/v2/directoryShare/create?url=" + encodeURIComponent(url) +
+                "&pwd=" + encodeURIComponent(pwd || "") + "&token=" + encodeURIComponent(key);
+    const resp = await fetch(api);
+    const j = await resp.json().catch(() => null);
+    const d = j && j.data ? j.data : j;
+    if(d && d.url){
+      $("#dirShareUrl").textContent = d.url;
+      $("#dirShareModal").style.display = "flex";
+      logOp("目录分享生成: " + d.url);
+      toast("目录分享页已生成", "ok");
+    }else{
+      const msg = (j && j.msg) || "分享文件夹失败";
+      toast(msg, "err");
+      logOp("分享文件夹失败: " + msg);
+    }
+  }catch(e){
+    toast("分享文件夹失败：" + e.message, "err");
+    logOp("分享文件夹异常: " + e.message);
+  }finally{
+    syncParseBtn();
+  }
 }
 
 /** /json/parser 单文件解析 */
@@ -1383,6 +1444,8 @@ function syncParseBtn(){
     const hasAny = has || $("#sharePwd").value.trim().length > 0 || $("#resultArea").innerHTML.trim().length > 0;
     clearBtn.disabled = !hasAny;
   }
+  const dsBtn = $("#dirShareBtn");
+  if(dsBtn) dsBtn.disabled = !has;
 }
 
 /** 顶部问候语：按当前时间动态显示，切页刷新 + 每分钟自动刷新 */
@@ -2685,6 +2748,15 @@ function syncUrlWrap(){
 function bindEvents(){
   $$(".tab").forEach(t => t.addEventListener("click", () => navigate(t.dataset.tab)));
   $("#parseBtn").addEventListener("click", handleParse);
+  $("#dirShareBtn").addEventListener("click", createDirShare);
+  $("#dirShareClose").addEventListener("click", () => { $("#dirShareModal").style.display = "none"; });
+  $("#dirShareCopy").addEventListener("click", () => {
+    const url = $("#dirShareUrl").textContent;
+    if(url){
+      navigator.clipboard.writeText(url).then(() => toast("已复制目录分享链接", "ok")).catch(() => {});
+    }
+  });
+  $("#dirShareModal").addEventListener("click", e => { if(e.target === $("#dirShareModal")) $("#dirShareModal").style.display = "none"; });
   const clearBtnEl = $("#clearBtn");
   if(clearBtnEl) clearBtnEl.addEventListener("click", () => {
     $("#shareUrl").value = "";
