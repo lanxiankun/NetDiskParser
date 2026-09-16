@@ -1,0 +1,2765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>云盘解析下载器</title>
+<style>
+/* ===== 设计 token（浅色简约风） ===== */
+:root{
+  --bg:#f5f6f8;
+  --bg-soft:#eef0f3;
+  --surface:#ffffff;
+  --surface-2:#f7f8fa;
+  --surface-3:#eef0f4;
+  --border:#e6e8ec;
+  --border-soft:#eceef1;
+  --text:#17181a;
+  --text-2:#7a818c;
+  --text-3:#a6adba;
+  --accent:#2f6bff;
+  --accent-dim:rgba(47,107,255,.08);
+  --sky:#2563eb;
+  --ok:#10b981;
+  --warn:#f59e0b;
+  --err:#ef4444;
+  --radius:16px;
+  --radius-sm:10px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  min-height:100dvh;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer}
+a{color:var(--sky);text-decoration:none}
+
+/* ===== 顶栏 ===== */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px 6px;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{
+  width:38px;height:38px;border-radius:11px;
+  background:linear-gradient(135deg,#2f6bff,#6a5cff);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 16px rgba(47,107,255,.28);
+}
+.brand-mark svg{width:20px;height:20px;stroke:#fff}
+.brand-name{font-size:14px;font-weight:700;letter-spacing:.2px}
+.brand-sub{font-size:11px;color:var(--text-2);margin-top:1px}
+.conn{
+  display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:6px 11px;border-radius:99px;background:var(--surface);border:1px solid var(--border);
+}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.conn.ok .conn-dot{background:var(--ok)}
+.conn.err .conn-dot{background:var(--err)}
+.conn.pending .conn-dot{background:var(--warn)}
+
+/* ===== 主视图 ===== */
+main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
+.view{padding-top:calc(env(safe-area-inset-top, 0px) + 18px);display:none}
+.view.active{display:block;animation:fadeIn .22s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ===== 解析页 hero ===== */
+.parse-hero{padding:20px 4px 16px}
+.parse-title{font-size:26px;font-weight:800;letter-spacing:.5px}
+.parse-greet{font-size:13px;color:var(--text-2);margin-top:3px}
+
+/* ===== 粘贴卡片 ===== */
+.paste-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 14px 16px;
+  box-shadow:0 2px 10px rgba(23,24,26,.04);
+}
+.paste-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.paste-label{font-size:13px;font-weight:700}
+.paste-actions{display:flex;gap:7px}
+.chip{
+  font-size:12px;font-weight:600;color:var(--text-2);
+  padding:5px 11px;border-radius:99px;background:var(--surface-2);
+  border:1px solid var(--border);transition:all .18s;
+  display:flex;align-items:center;gap:4px;
+}
+.chip svg{width:13px;height:13px;stroke:currentColor}
+.chip:active{transform:scale(.95)}
+.chip.primary{color:var(--accent);background:var(--accent-dim);border-color:rgba(47,107,255,.2)}
+#shareUrl{
+  width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface-2);color:var(--text);
+  font-family:inherit;font-size:13.5px;line-height:1.55;
+  padding:12px 13px;resize:none;min-height:64px;outline:none;
+  transition:border-color .18s,box-shadow .18s;
+}
+#shareUrl:focus{border-color:var(--border)}
+#shareUrl::placeholder{color:var(--text-3)}
+.proxy-line{display:flex;align-items:center;justify-content:space-between;margin:10px 2px 0}
+.proxy-label{font-size:13px;color:#374151;font-weight:500;display:flex;flex-direction:column;line-height:1.3}
+.proxy-sub{font-size:11px;color:#9ca3af;font-weight:400}
+.proxy-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.proxy-status{font-size:11px;color:#9ca3af;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.proxy-status.ok{color:#10b981}
+.switch{width:46px;height:26px;border-radius:13px;background:#d0d5dd;position:relative;transition:background .2s;cursor:pointer;flex-shrink:0}
+.switch.on{background:#10b981}
+.switch .knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on .knob{left:23px}
+.field-hint{font-size:11.5px;color:var(--ok);margin-top:7px}
+
+/* ===== 解析按钮 ===== */
+.parse-btns{display:flex;gap:10px;margin-top:12px}
+.parse-btns .btn-primary2{flex:1}
+.btn-ghost2{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:14px;font-weight:700;padding:12px 0;border-radius:12px;
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border);
+  transition:all .18s;
+}
+.btn-ghost2:active{transform:scale(.97)}
+.btn-ghost2 svg{width:16px;height:16px;stroke:currentColor}
+.btn-primary2{
+  flex:2.2;display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:14px;font-weight:700;padding:12px 0;border-radius:12px;
+  background:linear-gradient(135deg,#2f6bff,#5a4dff);color:#fff;
+  box-shadow:0 6px 18px rgba(47,107,255,.3);transition:all .18s;
+}
+.btn-primary2:active:not(:disabled){transform:scale(.97)}
+.btn-primary2:disabled{background:#d8dbe0;color:#9aa1ab;box-shadow:none;cursor:not-allowed}
+.btn-primary2 svg{width:16px;height:16px;stroke:currentColor}
+
+/* ===== 支持类型卡 ===== */
+.type-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;margin-top:14px;
+}
+.type-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.type-title svg{width:15px;height:15px;stroke:var(--accent)}
+.type-desc{font-size:12px;color:var(--text-2);line-height:1.8;margin-top:6px}
+.type-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.type-tag{font-size:11px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);padding:3px 9px;border-radius:99px}
+
+/* ===== 通用卡片 ===== */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:15px 16px;margin-bottom:14px;
+  box-shadow:0 2px 10px rgba(23,24,26,.04);
+}
+.card-title{
+  font-size:13.5px;font-weight:700;display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:11px;
+}
+.rule{flex:1;height:1px;background:var(--border-soft);margin:0 10px}
+
+/* ===== 视图切换 ===== */
+.view-switch{display:inline-flex;gap:3px;margin-left:auto}
+.view-switch button{width:28px;height:25px;border:1px solid var(--border-soft);background:var(--surface-2);color:var(--text-2);border-radius:6px;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:all .15s}
+.view-switch button:hover{color:var(--text)}
+.view-switch button.active{color:#fff;background:var(--accent);border-color:var(--accent)}
+/* 图标视图（文件管理器 4 列网格卡片：图标+名称+大小+时间，图1 风格） */
+.nav-content.tree-grid{display:flex !important;flex-direction:row !important;flex-wrap:wrap !important;gap:10px !important;align-content:flex-start}
+.nav-content.tree-list{display:flex !important;flex-direction:column !important;gap:6px !important}
+.tree-grid .tree-item{flex:0 0 calc(25% - 8px);width:calc(25% - 8px);min-width:72px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:10px 4px 8px;position:relative;cursor:pointer}
+@media (min-width:520px){ .tree-grid .tree-item{flex-basis:calc(20% - 8px);width:calc(20% - 8px)} }
+@media (min-width:720px){ .tree-grid .tree-item{flex-basis:calc(16.66% - 8px);width:calc(16.66% - 8px)} }
+.tree-grid .tree-item .t-icon{width:44px;height:44px;border-radius:11px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:24px;height:24px}
+.tree-grid .tree-item .t-main{width:100%;min-width:0}
+.tree-grid .tree-item .t-name{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;font-weight:550}
+.tree-grid .tree-item .t-size{font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-time{font-size:10px;color:var(--text-3);opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-check{display:none}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:5px;top:5px;padding:2px 6px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+.tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
+.tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-grid .tree-item.folder .t-name{color:var(--warn)}
+.tree-grid .tree-item.folder .t-icon svg{stroke:var(--warn)}
+.tree-grid .tree-item .t-icon{width:46px;height:46px;border-radius:11px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:25px;height:25px}
+.tree-grid .tree-item .t-main{width:100%;min-width:0}
+.tree-grid .tree-item .t-name{font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;font-weight:550}
+.tree-grid .tree-item .t-size{font-size:11px;color:var(--text-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-time{font-size:10.5px;color:var(--text-3);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-check{display:none}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:6px;top:6px;padding:3px 7px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+.tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
+.tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-grid .tree-item.folder .t-name{color:var(--warn)}
+.tree-grid .tree-item.folder .t-icon svg{stroke:var(--warn)}
+/* 详情视图 */
+.tree-detail .tree-item{padding:12px 14px}
+.tree-detail .tree-item .t-name{font-size:14px}
+.tree-detail .tree-item .t-sub{font-size:12px;margin-top:3px}
+.nav-breadcrumb{display:flex;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.nav-breadcrumb::-webkit-scrollbar{display:none}
+.nav-crumb{flex:0 0 auto;color:var(--sky);cursor:pointer;padding:1px 4px;border-radius:5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-crumb.cur{flex:0 0 auto;color:var(--text);font-weight:650;cursor:default}
+.nav-sep{flex:0 0 auto;color:var(--text-3)}
+.nav-content{display:flex;flex-direction:column;gap:6px}
+
+/* ===== 表单（设置） ===== */
+.set-group{margin-bottom:16px}
+.set-group-title{font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:9px;letter-spacing:.4px}
+.field-tip{font-size:11.5px;color:var(--text-3);margin-top:4px;line-height:1.4}
+.field{margin-bottom:11px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px}
+.input-wrap{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:0 12px;transition:border-color .18s,box-shadow .18s;
+}
+.input-wrap:focus-within{border-color:var(--border)}
+.input-wrap svg{width:16px;height:16px;stroke:var(--text-3);flex-shrink:0}
+.input-wrap input{
+  flex:1;border:none;background:none;color:var(--text);
+  font-family:inherit;font-size:13.5px;padding:11px 0;outline:none;min-width:0;
+}
+.input-wrap input::placeholder{color:var(--text-3)}
+.clear-btn{color:var(--text-3);font-size:16px;line-height:1;padding:4px;flex-shrink:0}
+.set-note{font-size:11.5px;color:var(--text-2);line-height:1.7;margin-top:2px}
+.set-note code{font-family:var(--mono);font-size:10.5px;background:var(--surface-2);border:1px solid var(--border);padding:1px 5px;border-radius:5px;color:var(--sky)}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ===== 按钮（通用） ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font-size:13.5px;font-weight:700;padding:11px 16px;border-radius:12px;
+  transition:all .18s;color:var(--text);
+}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,#2f6bff,#5a4dff);color:#fff;box-shadow:0 6px 18px rgba(47,107,255,.28)}
+.btn-primary:hover:not(:disabled){box-shadow:0 8px 24px rgba(47,107,255,.4)}
+.btn-ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover:not(:disabled){background:var(--surface-3)}
+.btn-danger{background:rgba(239,68,68,.08);color:var(--err);border:1px solid rgba(239,68,68,.25)}
+.btn-sm{padding:7px 12px;font-size:12px;border-radius:9px}
+.btn-block{width:100%}
+.btn svg{width:15px;height:15px;stroke:currentColor}
+.icon-btn{color:var(--text-3);display:inline-flex;align-items:center;justify-content:center;transition:color .18s}
+.icon-btn:active{transform:scale(.9)}
+.icon-btn svg{width:17px;height:17px;stroke:currentColor}
+
+/* ===== 状态卡（下载页） ===== */
+.status-card{display:flex;align-items:center;gap:12px}
+.status-ring{
+  width:42px;height:42px;border-radius:12px;flex-shrink:0;
+  background:var(--accent-dim);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+}
+.status-ring svg{width:20px;height:20px;stroke:currentColor}
+.status-main{flex:1;min-width:0}
+.status-title{font-size:13.5px;font-weight:700}
+.status-sub{font-size:11.5px;color:var(--text-2);margin-top:2px;word-break:break-all}
+.status-act{flex-shrink:0}
+
+/* ===== 历史 ===== */
+.history-item{
+  display:flex;align-items:center;gap:10px;padding:10px 2px;
+  border-bottom:1px solid var(--border-soft);cursor:pointer;
+}
+.history-item:last-child{border-bottom:none}
+.history-item:active{opacity:.7}
+.his-icon{width:34px;height:34px;border-radius:10px;background:var(--surface-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.his-icon svg{width:16px;height:16px;stroke:currentColor}
+.his-main{flex:1;min-width:0}
+.his-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.his-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.his-del{color:var(--text-3);padding:6px}
+.his-del:active{transform:scale(.85)}
+.his-del svg{width:15px;height:15px;stroke:currentColor}
+.empty-tip{font-size:12.5px;color:var(--text-3);text-align:center;padding:18px 0}
+
+/* ===== 任务列表 ===== */
+.task-item{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:13px 15px;margin-bottom:10px;
+}
+.task-head{display:flex;align-items:center;gap:9px}
+.task-name{flex:1;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
+.task-badge.running{background:rgba(47,107,255,.1);color:var(--accent)}
+.task-badge.done{background:rgba(16,185,129,.1);color:var(--ok)}
+.task-badge.error{background:rgba(239,68,68,.1);color:var(--err)}
+.task-badge.paused{background:rgba(245,158,11,.12);color:var(--warn)}
+.task-prog{height:5px;background:var(--surface-3);border-radius:3px;margin-top:9px;overflow:hidden}
+.task-prog i{display:block;height:100%;background:linear-gradient(90deg,#2f6bff,#5a4dff);border-radius:3px;transition:width .4s}
+.task-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:7px}
+.task-acts{display:flex;gap:7px;margin-top:9px;justify-content:flex-end}
+.task-acts .btn{padding:6px 12px;font-size:11.5px;border-radius:8px}
+
+/* ===== 底部导航 ===== */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:60;
+  display:flex;background:rgba(255,255,255,.96);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--border);
+  padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -4px 20px rgba(23,24,26,.05);
+}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:9px 0 8px;color:var(--text-3);transition:color .2s;
+  min-height:52px;justify-content:center;position:relative;
+}
+.tab svg{width:21px;height:21px;stroke:currentColor}
+.tab span{font-size:10.5px;font-weight:600;letter-spacing:.3px}
+.tab.active{color:var(--accent)}
+.tab.active::before{content:"";position:absolute;top:0;width:34px;height:2.5px;border-radius:0 0 4px 4px;background:var(--accent)}
+
+/* ===== Toast ===== */
+#toast{
+  position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));z-index:100;
+  transform:translateX(-50%) translateY(14px);
+  background:var(--text);color:#fff;font-size:13px;font-weight:500;
+  padding:10px 18px;border-radius:11px;opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s;max-width:88vw;text-align:center;
+  box-shadow:0 10px 34px rgba(0,0,0,.22);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:#ef4444}
+#toast.ok{background:#10b981}
+
+/* ===== 折叠说明 ===== */
+.detail{font-size:12.5px;color:var(--text-2);line-height:1.75}
+.detail ol{padding-left:18px;margin:6px 0}
+.detail li{margin-bottom:5px}
+.detail code{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;border-radius:5px;color:var(--sky)}
+.detail b{color:var(--text)}
+details.fold{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:14px}
+details.fold summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text);list-style:none;display:flex;align-items:center;gap:9px;outline:none;-webkit-tap-highlight-color:transparent;background:transparent!important}
+details.fold summary:active,details.fold summary:focus,details.fold summary:focus-visible{background:transparent!important;color:var(--text)!important;outline:none;-webkit-tap-highlight-color:transparent}
+details.fold summary::-webkit-details-marker{display:none}
+details.fold summary svg{width:15px;height:15px;stroke:var(--text-2);transition:transform .2s}
+details.fold[open] summary svg{transform:rotate(90deg)}
+details.fold .detail{margin-top:11px;padding-top:11px;border-top:1px dashed var(--border)}
+
+/* ===== 日志弹窗 ===== */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(23,24,26,.5);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:660px;max-height:84vh;display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.18);
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 14px;border-bottom:1px solid var(--border-soft);font-size:14px;
+}
+.modal-head .btns{display:flex;gap:8px}
+.logs-pre{
+  margin:0;padding:12px 14px;overflow:auto;flex:1;
+  font-family:var(--mono);font-size:11px;line-height:1.65;
+  color:var(--text-2);white-space:pre-wrap;word-break:break-all;background:var(--bg-soft);
+  min-height:220px;
+}
+
+/* ===== 桌面适配 ===== */
+@media (min-width:900px){
+  .tabbar{top:0;bottom:auto;right:16px;left:auto;border:none;background:none;box-shadow:none;padding:0}
+  .tab{padding:0;min-width:0;width:auto;min-height:44px;padding:0 16px;position:relative}
+  .tab.active::before{top:auto;bottom:-1px;width:100%;height:2.5px;border-radius:4px 4px 0 0}
+  .tab span{font-size:12px}
+  main{padding:22px 24px 48px}
+  .card{padding:20px}
+}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+
+
+/* ===== 恢复的功能组件样式（浅色适配） ===== */
+button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer}
+::selection{background:rgba(45,212,191,.28)}
+/* ===== 顶栏 ===== */
+.topbar{position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background:rgba(12,17,24,.86);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border-soft);}
+.conn{display:flex;align-items:center;gap:7px;
+  font-size:11.5px;color:var(--text-2);
+  background:var(--surface);border:1px solid var(--border-soft);
+  padding:6px 11px;border-radius:999px;white-space:nowrap;}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--text-3);flex:none;transition:background .3s}
+.conn.on .conn-dot{background:var(--ok);box-shadow:0 0 8px rgba(52,211,153,.7)}
+.conn.off .conn-dot{background:var(--err)}
+.conn.pending .conn-dot{background:var(--warn);animation:pulse 1s infinite}
+.input-wrap.has-value .clear-btn{display:block}
+.btn-danger{background:rgba(248,113,113,.12);color:var(--err);border:1px solid rgba(248,113,113,.3)}
+.spin{animation:rot .8s linear infinite}
+/* ===== 解析结果 ===== */
+.result-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.file-icon{width:46px;height:46px;border-radius:12px;flex:none;
+  display:grid;place-items:center;background:var(--surface-2);
+  border:1px solid var(--border);}
+.file-icon svg{width:22px;height:22px;stroke:var(--accent)}
+.file-meta{flex:1;min-width:0}
+.file-name{font-size:15.5px;font-weight:650;word-break:break-all;line-height:1.35}
+.file-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;
+  background:var(--surface-3);color:var(--text-2);}
+.tag.ok{background:rgba(52,211,153,.12);color:var(--ok)}
+.tag.warn{background:rgba(251,191,36,.12);color:var(--warn)}
+.tag.info{background:rgba(56,189,248,.12);color:var(--sky)}
+.link-box{background:var(--bg-soft);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 12px;margin:12px 0;
+  display:flex;align-items:center;gap:10px;}
+.link-box code{flex:1;font-family:var(--mono);font-size:12px;color:var(--text-2);
+  word-break:break-all;max-height:64px;overflow-y:auto;}
+.icon-btn{width:30px;height:30px;border-radius:8px;flex:none;
+  display:grid;place-items:center;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--text-2);
+  transition:color .2s,border-color .2s;}
+.icon-btn:hover{color:var(--accent);border-color:var(--accent)}
+.icon-btn svg{width:15px;height:15px;stroke:currentColor}
+.icon-btn.copied{color:var(--ok);border-color:var(--ok)}
+.hint-box{display:flex;gap:9px;align-items:flex-start;
+  background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.22);
+  border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;}
+.hint-box svg{width:15px;height:15px;stroke:var(--warn);flex:none;margin-top:2px}
+.hint-box p{font-size:12.5px;color:#d9c48a;line-height:1.55}
+.hint-box code{font-family:var(--mono);font-size:11.5px;background:rgba(251,191,36,.1);padding:1px 5px;border-radius:4px}
+.action-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.dl-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);margin-top:6px}
+/* ===== 目录树 ===== */
+.tree{display:flex;flex-direction:column;gap:6px}
+.tree-item{display:flex;align-items:center;gap:10px;
+  background:var(--bg-soft);border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm);padding:10px 12px;
+  transition:border-color .2s;}
+.tree-item:hover{border-color:var(--border)}
+.tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-item .t-icon{width:30px;height:30px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;flex:none}
+.tree-item .t-icon svg{width:16px;height:16px;stroke:var(--sky)}
+.tree-item.folder .t-icon svg{stroke:var(--warn)}
+.tree-item .t-main{flex:1;min-width:0}
+.tree-item .t-name{font-size:13.5px;font-weight:550;word-break:break-all;line-height:1.35}
+.tree-item .t-sub{font-size:11.5px;color:var(--text-3);margin-top:2px}
+.tree-item .t-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);flex:none;display:grid;place-items:center;transition:all .15s}
+.tree-item .t-check svg{width:12px;height:12px;stroke:#04241f;opacity:0}
+.tree-item.checked .t-check{background:var(--accent);border-color:var(--accent)}
+.tree-item.checked .t-check svg{opacity:1}
+.tree-item .t-dl{flex:none}
+.tree-children{margin-left:22px;border-left:1px dashed var(--border);padding-left:12px;display:flex;flex-direction:column;gap:6px}
+.tree-loading,.tree-empty{color:var(--text-3);font-size:12.5px;padding:12px 4px;text-align:center}
+.tree-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:12.5px;color:var(--text-2);margin-bottom:12px;flex-wrap:wrap;}
+.tree-summary strong{color:var(--text)}
+.tree-item.open .arrow-rotate{transform:rotate(90deg)}
+.history-item .h-main{flex:1;min-width:0}
+.history-item .h-name{font-size:13px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-item .h-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.history-item .h-time{font-size:11px;color:var(--text-3);flex:none}
+.empty{text-align:center;padding:34px 16px;color:var(--text-3);
+  display:flex;flex-direction:column;align-items:center;gap:12px;}
+.empty svg{width:38px;height:38px;stroke:var(--text-3);opacity:.5}
+.empty p{font-size:13px;line-height:1.7;max-width:300px}
+.empty .emph{color:var(--text-2);font-weight:600}
+.status-card.on .status-ring{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.08)}
+.status-card.on .status-ring svg{stroke:var(--ok)}
+.status-card.off .status-ring svg{stroke:var(--err)}
+.task-card{background:var(--surface);border:1px solid var(--border-soft);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;
+  transition:border-color .2s;}
+.task-card:hover{border-color:var(--border)}
+.task-card.selected{border-color:var(--accent);background:linear-gradient(180deg,var(--accent-dim),transparent 70%)}
+.task-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:10px}
+.task-check{width:20px;height:20px;border-radius:6px;flex:none;margin-top:1px;
+  border:2px solid var(--border);display:grid;place-items:center;
+  transition:all .15s;}
+.task-check svg{width:12px;height:12px;stroke:#04241f;opacity:0}
+.task-check.on{background:var(--accent);border-color:var(--accent)}
+.task-check.on svg{opacity:1}
+.task-name{flex:1;font-size:13.5px;font-weight:600;word-break:break-all;line-height:1.4}
+.task-name .src{display:block;font-family:var(--mono);font-size:10.5px;color:var(--text-3);font-weight:400;margin-top:3px;word-break:break-all}
+.badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;flex:none;
+  letter-spacing:.4px;}
+.badge.running{background:rgba(56,189,248,.13);color:var(--sky)}
+.badge.done{background:rgba(52,211,153,.13);color:var(--ok)}
+.badge.pause{background:rgba(251,191,36,.13);color:var(--warn)}
+.badge.wait{background:rgba(143,160,177,.16);color:var(--text-2)}
+.badge.ready{background:rgba(143,160,177,.16);color:var(--text-2)}
+.badge.error{background:rgba(248,113,113,.13);color:var(--err)}
+.pbar{height:6px;border-radius:999px;background:var(--bg-soft);overflow:hidden;margin-bottom:9px}
+.pbar>div{height:100%;border-radius:999px;background:linear-gradient(90deg,#0f766e,var(--accent));transition:width .5s ease;min-width:0}
+.pbar.error>div{background:var(--err)}
+.pbar.pause>div{background:var(--warn)}
+.task-progress-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-2);margin-bottom:7px}
+.task-progress-row .pct{font-family:var(--mono);font-weight:600;color:var(--text)}
+.wave{width:100%;height:34px;display:block;margin-bottom:8px;opacity:.9}
+.task-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.task-stats{font-size:11px;color:var(--text-3);display:flex;gap:10px;flex-wrap:wrap}
+.task-ops{display:flex;gap:6px;flex:none}
+.op-btn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);
+  transition:color .18s,border-color .18s,background .18s;}
+.op-btn:hover{color:var(--text);border-color:var(--text-3)}
+.op-btn.danger:hover{color:var(--err);border-color:var(--err)}
+.op-btn svg{width:14px;height:14px;stroke:currentColor}
+.batch-bar{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom));z-index:30;
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:12px;padding:9px 12px;margin-bottom:14px;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);}
+.batch-bar .bb-info{flex:1;font-size:12.5px;color:var(--text-2)}
+.batch-bar .bb-info strong{color:var(--text)}
+.toggle-row .t-sub{font-size:11px;color:var(--text-3);margin-top:2px}
+.switch.on{background:var(--accent)}
+.switch.on::after{transform:translateX(19px);background:#04241f}
+details.fold[open] summary svg{transform:rotate(90deg)}
+
+/* ===== 禁用缩放与滚动条 ===== */
+html,body{
+  -ms-overflow-style:none;
+  scrollbar-width:none;
+  overflow-x:hidden;
+  touch-action:pan-y;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
+}
+input, textarea{
+  user-select:text;
+  -webkit-user-select:text;
+  -webkit-touch-callout:default;
+}
+::-webkit-scrollbar{display:none;width:0;height:0}
+body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:none;width:0;height:0}
+/* ===== 设置页署名 ===== */
+.set-author{margin-top:16px;text-align:center;font-size:11.5px;color:var(--text-3);user-select:none;-webkit-user-select:none}
+
+/* ===== 分享详情（解析结果卡片，每行点击复制） ===== */
+.share-detail-card{margin-top:14px}
+.share-detail-card .card-title{margin-bottom:2px}
+.sd-rows{display:flex;flex-direction:column}
+.sd-row{display:flex;align-items:flex-start;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+.sd-row:last-child{border-bottom:none}
+.sd-row:active{opacity:.55}
+.sd-row.copied .sd-label{color:var(--ok)}
+.sd-label{width:96px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--text-2);line-height:1.55;padding-top:1px}
+.sd-value{flex:1;font-size:12.5px;color:var(--text);word-break:break-all;line-height:1.55}
+.sum-btns{display:inline-flex;gap:6px;flex-wrap:wrap}
+.btn:disabled{opacity:.45;pointer-events:none}
+.tree-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between;padding:8px 12px;font-size:12.5px;color:var(--text-3)}
+</style>
+</head>
+<body>
+
+
+
+<!-- ===== 主视图 ===== -->
+<main>
+
+  <!-- 解析视图 -->
+    <section class="view" data-route="parse">
+    <div class="parse-hero">
+      <div class="parse-title">分享解析</div>
+      <div class="parse-greet" id="greetText"></div>
+    </div>
+    <div class="paste-card">
+      <div class="paste-head">
+        <div class="paste-label">粘贴内容</div>
+        <div class="paste-actions">
+          <button class="chip primary" id="clipBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11v6"/><path d="m9 14 3 3 3-3"/></svg>
+            读取剪贴板
+          </button>
+        </div>
+      </div>
+      <textarea id="shareUrl" rows="2" placeholder="粘贴分享链接或包含链接的文本"></textarea>
+      <p class="field-hint" id="clipHint" style="display:none"></p>
+      <div class="parse-btns">
+        <button class="btn-ghost2" id="clearBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          清空
+        </button>
+        <button class="btn-primary2" id="parseBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="parseIcon"><path d="M12 3v13"/><path d="m5 10 7 7 7-7"/></svg>
+          <span id="parseBtnText">开始解析</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="resultArea"></div>
+
+  </section>
+
+  <!-- 历史视图 -->
+  <section class="view" data-route="history">
+    <div class="parse-hero">
+      <div class="parse-title">解析历史</div>
+      <div class="parse-greet">点击记录可重新解析</div>
+    </div>
+    <div class="card">
+      <div class="card-title">历史记录 <span class="rule"></span>
+        <button class="icon-btn" id="historyClear" title="清空历史" style="width:24px;height:24px">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <!-- 下载视图 -->
+  <section class="view" data-route="downloads">
+    <div id="batchBar"></div>
+    <div id="tasksArea"></div>
+  </section>
+
+  <!-- 设置视图 -->
+  <section class="view" data-route="mine">
+    <div class="card">
+            <div class="set-group">
+        <div class="field">
+          <label for="setDlDir">下载目录</label>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <input id="setDlDir" type="text" autocomplete="off" placeholder="C:\Users\你\Downloads">
+          </div>
+        </div>
+        <div class="row-2" style="grid-template-columns:1fr 110px">
+          <div class="field">
+            <label for="setThreads">单任务线程数</label>
+            <div class="input-wrap">
+              <input id="setThreads" type="number" min="1" max="64" value="16">
+            </div>
+            <p class="field-tip">夸克等网盘线程越多越快（建议 16~32）；123网盘走节点建议调低（4~8），连接少更可能全部走手机节点满速</p>
+          </div>
+          <div class="field">
+            <label for="setMaxRunning">并发任务数</label>
+            <div class="input-wrap">
+              <input id="setMaxRunning" type="number" min="1" max="20" value="5">
+            </div>
+          </div>
+        </div>
+        <div class="field" id="nodeProxyRow" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <label>节点代理</label>
+            <p class="field-tip" style="margin-top:2px">内置 dnode 节点 · 123 网盘提速（实验）</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="nodeProxyStatus" style="font-size:12px;color:#8a94a6;max-width:150px;text-align:right;white-space:pre-line"></span>
+          </div>
+        </div>
+        <p class="set-note">下载引擎已内置在本程序中，随 App 启动运行，无需单独安装。下载目录填写本机绝对路径，保存后立即生效。</p>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" id="testConnBtn" style="flex:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+          检测引擎
+        </button>
+        <button class="btn btn-primary" id="saveBtn" style="flex:1.4">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
+          保存设置
+        </button>
+      </div>
+      <button class="btn btn-ghost" id="logsBtn" style="width:100%;margin-top:10px">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        查看运行日志
+      </button>
+    </div>
+
+    <div class="set-author">作者：南在南方</div>
+  </section>
+</main>
+
+<!-- ===== 底部导航 ===== -->
+<nav class="tabbar">
+  <button class="tab" data-tab="parse">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <span>解析</span>
+  </button>
+  <button class="tab" data-tab="history">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+    <span>历史</span>
+  </button>
+  <button class="tab" data-tab="downloads">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m5 10 7 7 7-7"/><path d="M4 21h16"/></svg>
+    <span>下载</span>
+  </button>
+  <button class="tab" data-tab="mine">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></svg>
+    <span>我的</span>
+  </button>
+</nav>
+
+<div id="toast"></div>
+
+<!-- 日志弹窗 -->
+<div id="logsModal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <b>运行日志</b>
+      <div class="btns">
+        <button class="btn btn-ghost btn-sm" id="logsRefresh">刷新</button>
+        <button class="btn btn-ghost btn-sm" id="logsCopy">复制</button>
+        <button class="btn btn-ghost btn-sm" id="logsClose">关闭</button>
+      </div>
+    </div>
+    <pre id="logsContent" class="logs-pre">加载中…</pre>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   云盘解析下载器 · 桌面 App（内置 Gopeed）
+   - 解析引擎：189.qaiu.top，经本地代理 /parse/* 转发（免跨域）
+   - 下载引擎：Gopeed 内置运行，同源 /api/v1/* 访问
+   ============================================================ */
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+const ICONS = {
+  file: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>',
+  archive: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 14h6"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>',
+  audio: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 14 8-14 8z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  resume: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 14 8-14 8z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  open: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  box: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m5 10 7 7 7-7"/><path d="M4 21h16"/></svg>',
+  external: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>',
+};
+
+/* ================= 存储 ================= */
+const LS_KEY = "netdisk_parser_v1";
+const defaultSettings = {
+  apiKey: "",
+  nodeProxy: { host: "47.99.111.81", port: 1080, username: "nfdnode", password: "nfd6666" },
+  dlDir: "",
+  threads: 8,
+  maxRunning: 5,
+};
+let settings = loadSettings();
+// 节点代理固定内置默认节点（123 等 CDN 直链下载需经节点 SOCKS5 中转）
+settings.nodeProxy = { host: "47.99.111.81", port: 1080, username: "nfdnode", password: "nfd6666" };
+let history = loadHistory();
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return {...defaultSettings};
+    const s = JSON.parse(raw);
+    return {...defaultSettings, ...s};
+  }catch(e){ return {...defaultSettings}; }
+}
+function saveSettings(){
+  localStorage.setItem(LS_KEY, JSON.stringify(settings));
+}
+function loadHistory(){
+  try{
+    const raw = localStorage.getItem(LS_KEY + "_history");
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveHistory(){
+  localStorage.setItem(LS_KEY + "_history", JSON.stringify(history.slice(0, 20)));
+}
+function addHistory(item){
+  history = history.filter(h => h.url !== item.url);
+  history.unshift({...item, time: Date.now()});
+  saveHistory();
+  renderHistory();
+}
+
+/* ================= 工具函数 ================= */
+function fmtSize(bytes){
+  if(bytes === null || bytes === undefined || isNaN(bytes)) return "未知";
+  if(bytes < 1024) return bytes + " B";
+  const units = ["KB","MB","GB","TB"];
+  let v = bytes;
+  let i = -1;
+  do{ v /= 1024; i++; }while(v >= 1024 && i < units.length - 1);
+  return v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2) + " " + units[i];
+}
+function fmtSpeed(bps){
+  if(!bps) return "0 B/s";
+  return fmtSize(bps) + "/s";
+}
+function fmtDuration(ms){
+  if(ms < 1000) return "1 秒";
+  const s = Math.floor(ms / 1000);
+  if(s < 60) return s + " 秒";
+  const m = Math.floor(s / 60);
+  if(m < 60) return m + " 分 " + (s % 60) + " 秒";
+  const h = Math.floor(m / 60);
+  return h + " 时 " + (m % 60) + " 分";
+}
+function fmtTime(ts){
+  if(!ts) return "";
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getMonth()+1}-${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+function fileTypeIcon(type){
+  const t = (type || "").toLowerCase();
+  if(["mp4","mkv","avi","mov","rmvb","flv","wmv","webm","m4v"].includes(t)) return ICONS.video;
+  if(["jpg","jpeg","png","gif","webp","bmp","svg","heic"].includes(t)) return ICONS.image;
+  if(["zip","rar","7z","tar","gz","bz2","xz","iso"].includes(t)) return ICONS.archive;
+  if(["pdf","doc","docx","xls","xlsx","ppt","pptx","txt","md","epub"].includes(t)) return ICONS.doc;
+  if(["mp3","flac","wav","aac","ogg","m4a"].includes(t)) return ICONS.audio;
+  if(t === "folder") return ICONS.folder;
+  return ICONS.file;
+}
+function fileTypeTag(type){
+  const t = (type || "").toLowerCase();
+  if(t === "folder") return ["folder", "目录"];
+  if(["mp4","mkv","avi","mov","webm"].includes(t)) return ["video", t.toUpperCase()];
+  if(["zip","rar","7z","iso"].includes(t)) return ["archive", t.toUpperCase()];
+  if(["jpg","png","gif","webp"].includes(t)) return ["image", t.toUpperCase()];
+  return [null, t ? t.toUpperCase() : "文件"];
+}
+let toastTimer = null;
+function toast(msg, type){
+  const el = $("#toast");
+  el.textContent = msg;
+  el.className = "show" + (type ? " " + type : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = "", 2600);
+}
+
+/* ================= 解析 API（本地代理 /parse/* → 189.qaiu.top） ================= */
+const PARSER_BASE = "/parse";
+
+function parseApiKey(){
+  // 新 App 解析/下载链路免 API Key（链接自带签名），此函数仅兼容残留调用
+  return (settings.apiKey || "").trim() || null;
+}
+
+/** /json/parser 单文件解析 */
+async function apiParseJson(shareUrl, pwd){
+  const key = parseApiKey();
+  if(!key) throw new Error("NO_KEY");
+  const params = new URLSearchParams({ url: shareUrl, token: key });
+  if(pwd) params.append("pwd", pwd);
+  const resp = await fetch(`${PARSER_BASE}/json/parser?${params}`);
+  if(!resp.ok) throw new Error("解析服务响应异常 (HTTP " + resp.status + ")");
+  const json = await resp.json();
+  if(json.code !== 200){
+    throw new Error(parseErrMsg(json.code, json.msg));
+  }
+  return json.data;
+}
+
+/** /v2/directoryShare 解析站目录分享（免 API Key，链接自带 apiKeySign 签名） */
+async function apiDirectoryShare(code){
+  const resp = await fetch(`${PARSER_BASE}/v2/directoryShare/${encodeURIComponent(code)}`);
+  if(!resp.ok) throw new Error("目录分享服务响应异常 (HTTP " + resp.status + ")");
+  const json = await resp.json().catch(() => null);
+  if(!json || !Array.isArray(json.fileList)) throw new Error((json && json.msg) || "目录分享解析失败");
+  return json;
+}
+
+/** /v2/linkInfo 链接详情（实测需带 API Key，否则返回 500） */
+async function apiLinkInfo(shareUrl, pwd){
+  const key = parseApiKey();
+  const params = new URLSearchParams({ url: shareUrl });
+  if(key) params.append("token", key);
+  if(pwd) params.append("pwd", pwd);
+  const resp = await fetch(`${PARSER_BASE}/v2/linkInfo?${params}`);
+  const json = await resp.json().catch(() => null);
+  if(!json || json.code !== 200){
+    try{ await fetch("/log", { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: "linkInfo失败: code=" + (json && json.code) + " msg=" + (json && json.msg) + " http=" + resp.status }); }catch(e){}
+    return null;
+  }
+  return json.data;
+}
+
+/** /v2/getFileList 目录文件列表（需鉴权，不消耗额度） */
+async function apiGetFileList(shareUrl, pwd){
+  const key = parseApiKey();
+  if(!key) throw new Error("NO_KEY");
+  const params = new URLSearchParams({ url: shareUrl, token: key });
+  if(pwd) params.append("pwd", pwd);
+  const resp = await fetch(`${PARSER_BASE}/v2/getFileList?${params}`);
+  if(!resp.ok) throw new Error("目录服务响应异常 (HTTP " + resp.status + ")");
+  const json = await resp.json();
+  if(json.code !== 200){
+    throw new Error(parseErrMsg(json.code, json.msg));
+  }
+  return json.data || [];
+}
+
+function parseErrMsg(code, msg){
+  switch(code){
+    case 400: return "参数错误：请检查分享链接格式";
+    case 401: return "API Key 无效，请在设置中检查";
+    case 403: return "额度不足或无权限（403）";
+    case 500: return "解析失败：分享链接可能已失效或网盘限制";
+    default: return msg || ("解析失败（" + code + "）");
+  }
+}
+
+/** 平台防盗链 Header（文档「踩坑指南」+ 实测补充） */
+function antiHotlinkHeader(panType, otherParam){
+  const h = {};
+  const pan = (panType || "").toLowerCase();
+  if(pan === "cow") h["Referer"] = "https://cowtransfer.com/";
+  else if(pan === "pcx") h["Referer"] = "https://pan-yz.chaoxing.com";
+  else if(pan === "qk") h["Referer"] = "https://pan.quark.cn/";
+  else if(pan === "uc") h["Referer"] = "https://pan.uc.cn/";
+  else if(pan === "fj"){
+    if(otherParam && otherParam.UA) h["User-Agent"] = otherParam.UA;
+  }
+  // 夸克/UC 直链下载还需浏览器 UA，否则风控 403
+  if(pan === "qk" || pan === "uc"){
+    h["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  }
+  // linkInfo 返回的 otherParam 里若有自定义 header 则整包透传
+  // 注意：otherParam.UA 是解析站服务端的 Go 客户端标识，绝不能覆盖浏览器 UA（会触发网盘风控 403），
+  // 只在小飞机盘 fj 这种文档明确要求 otherParam.UA 的场景使用
+  if(otherParam && typeof otherParam === "object"){
+    if(otherParam.Referer) h["Referer"] = otherParam.Referer;
+    if(pan === "fj" && otherParam.UA) h["User-Agent"] = otherParam.UA;
+    if(otherParam.header && typeof otherParam.header === "object"){
+      // header 里若带 Cookie 也透传，但同样排除 URL 误判
+      for(const hk in otherParam.header){
+        if(/^cookie$/i.test(hk) && otherParam.header[hk] && !isCookieStr(otherParam.header[hk])) continue;
+        h[hk] = otherParam.header[hk];
+      }
+    }
+  }
+  return h;
+}
+
+/* ================= 内置 Gopeed API（同源 /api/v1/*） ================= */
+function gopeedBase(){
+  return "";
+}
+
+/** 解析网盘类型：优先文件项自带 panType → 目录/顶层 panType → API 路径里的网盘标识（兜底） */
+function resolvePan(itemPan, treePan, url){
+  if(itemPan) return itemPan;
+  if(treePan) return treePan;
+  const m = (url || "").match(/\/(?:redirectUrl|parser|linkInfo|directLink|getFileList)\/([a-z0-9]+)/i);
+  if(m) return m[1];
+  const m2 = (url || "").match(/[?&]panType=([a-z0-9]+)/i);
+  if(m2) return m2[1];
+  return "";
+}
+
+/** 从解析返回的 otherParam 里提取 Cookie（只认真正的 Cookie 串，排除 URL） */
+function extractCookie(op){
+  if(!op) return "";
+  // otherParam 可能整体是字符串（JSON 或 key=value 形式）
+  if(typeof op === "string"){
+    const m = op.match(/[Cc]ookie\s*[=:]\s*"?([^"&;\s]+)/);
+    if(m && isCookieStr(m[1])) return m[1];
+    try{ op = JSON.parse(op); }catch(e){ return ""; }
+  }
+  if(typeof op !== "object") return "";
+  for(const k of ["Cookie","cookie","COOKIE","ck","cookieStr"]){
+    if(op[k] && typeof op[k] === "string" && isCookieStr(op[k])) return op[k];
+  }
+  if(op.header && typeof op.header === "object"){
+    for(const k of ["Cookie","cookie","COOKIE"]){
+      if(op.header[k] && typeof op.header[k] === "string" && isCookieStr(op.header[k])) return op.header[k];
+    }
+  }
+  return "";
+}
+
+/** 判断是否为真正的 Cookie 串：name=value[; k=v...]，且不是 URL/JSON/链接 */
+function isCookieStr(v){
+  if(typeof v !== "string" || !v) return false;
+  if(v.length < 4 || v.length > 4000) return false;
+  if(/^https?:\/\//i.test(v.trim())) return false;      // 不是 URL
+  if(/^[\[\{]/.test(v.trim())) return false;              // 不是 JSON
+  if(/\s/.test(v.trim())) return false;                    // 不含空白
+  if(!/^[A-Za-z0-9_\-]+=/.test(v.trim())) return false;    // 必须 name=value 开头
+  return true;
+}
+
+/** 递归搜索对象里第一个真正的 Cookie 串（排除 URL 误判） */
+function findCookieDeep(obj, depth){
+  if(!obj || depth > 5) return "";
+  if(typeof obj === "string"){
+    if(isCookieStr(obj)) return obj;
+    return "";
+  }
+  if(typeof obj !== "object") return "";
+  for(const k of Object.keys(obj)){
+    if(/^cookie$/i.test(k)){
+      const v = obj[k];
+      if(typeof v === "string" && isCookieStr(v)) return v;
+      if(typeof v === "object" && v){
+        const sub = findCookieDeep(v, depth+1);
+        if(sub) return sub;
+      }
+    }
+  }
+  for(const k of Object.keys(obj)){
+    const v = findCookieDeep(obj[k], depth+1);
+    if(v) return v;
+  }
+  return "";
+}
+
+/** 解析成功后自动保存 cookie 到后端（用户零配置，下载代理自动携带） */
+async function autoSaveCookie(linkInfo, fileList){
+  const otherParam = linkInfo?.shareLinkInfo?.otherParam;
+  let cookie = extractCookie(otherParam);
+  let cookieSource = "otherParam";
+  // 新版解析结果扩展参数 fileInfo.extParameters 里可能携带 cookie/header
+  if(!cookie && fileList && Array.isArray(fileList)){
+    for(const it of fileList){
+      if(it && it.extParameters){
+        cookie = extractCookie(it.extParameters);
+        if(cookie){ cookieSource = "fileInfo.extParameters"; break; }
+      }
+    }
+  }
+  if(!cookie){
+    cookie = findCookieDeep(linkInfo);
+    cookieSource = "linkInfo递归";
+  }
+  if(!cookie){
+    cookie = findCookieDeep(fileList);
+    cookieSource = "fileList递归";
+  }
+  const keys = (otherParam && typeof otherParam === "object") ? Object.keys(otherParam) : [];
+  const info = {
+    linkInfoCode: linkInfo?.code,
+    hasOtherParam: !!otherParam,
+    otherParamType: typeof otherParam,
+    otherParamKeys: keys,
+    cookieFound: !!cookie,
+    cookieSource,
+    cookieLen: cookie ? cookie.length : 0,
+    linkInfoRaw: JSON.stringify(linkInfo).slice(0, 1500),
+  };
+  try{
+    await fetch("/log", { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: "解析Cookie调试: " + JSON.stringify(info) });
+  }catch(e){}
+  if(!cookie) return;
+  try{
+    const r = await fetch("/app/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quarkCookie: cookie }),
+    });
+    const j = await r.json();
+    try{ await fetch("/log", { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: "自动保存Cookie结果: " + JSON.stringify(j) }); }catch(e){}
+  }catch(e){}
+}
+function gopeedHeaders(json){
+  const h = {};
+  if(json !== false) h["Content-Type"] = "application/json";
+  return h;
+}
+async function gopeedFetch(path, options){
+  const url = gopeedBase() + path;
+  const resp = await fetch(url, {
+    method: options?.method || "GET",
+    headers: gopeedHeaders(options?.json !== false),
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+  });
+  let json = null;
+  try{ json = await resp.json(); }catch(e){}
+  if(json && typeof json.code === "number" && json.code !== 0){
+    throw new Error(json.msg || ("Gopeed 错误 (" + json.code + ")"));
+  }
+  if(!resp.ok){
+    throw new Error("Gopeed 请求失败 (HTTP " + resp.status + ")");
+  }
+  return json ? json.data : null;
+}
+
+/* ================= 解析流程 ================= */
+let parseBusy = false;
+let currentResult = null;      // 当前解析结果（单文件）
+let currentTree = null;        // 当前目录树 {rootUrl, rootPwd, panType, items, selected:Map}
+let currentLinkDetail = null;  // 当前分享详情（linkInfo.data，渲染"分享详情"卡片）
+let treeLoadedKeys = new Set(); // 已加载的目录 key
+let viewMode = localStorage.getItem("nfd_view_mode") || "grid"; // 视图: list/grid（文件管理器式浏览）
+const dirCache = new Map(); // 目录结果缓存: parserUrl -> {items, ts}（60s，自动深入结果也缓存）
+const DIR_TTL = 60 * 1000;
+
+/* ================= 剪贴板识别 ================= */
+function readClipboardText(){
+  return new Promise(resolve => {
+    // 优先原生桥（Android 上最可靠）
+    try{
+      if(window.AndroidBridge && typeof window.AndroidBridge.getClipboard === "function"){
+        const t = window.AndroidBridge.getClipboard();
+        if(t) return resolve(t);
+      }
+    }catch(e){}
+    // 浏览器标准接口兜底（需 https/localhost + 用户手势）
+    try{
+      if(navigator.clipboard && navigator.clipboard.readText){
+        navigator.clipboard.readText().then(t => resolve(t || "")).catch(() => resolve(""));
+        return;
+      }
+    }catch(e){}
+    resolve("");
+  });
+}
+
+/** 从剪贴板文本中识别分享链接与提取码 */
+/** 解析页提示条 */
+function showClipHint(msg){
+  const hint = $("#clipHint");
+  if(!hint) return;
+  hint.style.display = "block";
+  hint.textContent = msg;
+}
+
+/** 网盘域名识别表：域名后缀 → 平台名 */
+const PAN_DOMAINS = [
+  ["yun.139.com","移动云盘"],["caiyun.139.com","移动云盘"],["yun.139.com/shareweb","移动云盘"],
+  ["pan.quark.cn","夸克网盘"],["drive.uc.cn","UC网盘"],["pan.baidu.com","百度网盘"],
+  ["cloud.189.cn","天翼云盘"],["pan.xunlei.com","迅雷云盘"],["alipan.com","阿里云盘"],
+  ["aliyundrive.com","阿里云盘"],["lanzoux.com","蓝奏云"],["lanzouj.com","蓝奏云"],
+  ["lanzoui.com","蓝奏云"],["lanzou.com","蓝奏云"],["woozooo.com","蓝奏云"],
+  ["123pan.com","123云盘"],["cowtransfer.com","奶牛快传"],["share.weiyun.com","腾讯微云"],
+  ["chaoxing.com","超星云盘"],["pan.wps.cn","WPS云文档"],["drive.google.com","Google Drive"],
+  ["1drv.ms","OneDrive"],["onedrive.live.com","OneDrive"],["pan.huang1111.cn","Huang1111"],
+  ["pan.189.cn","天翼云盘"],["pan.quark.cn","夸克网盘"]
+];
+
+/** 从域名识别网盘平台 */
+function detectPanName(url){
+  try{
+    const u = new URL(url);
+    const h = u.hostname.toLowerCase();
+    for(const [dom, name] of PAN_DOMAINS){
+      if(h === dom || h.endsWith("." + dom)) return name;
+    }
+  }catch(e){}
+  return "";
+}
+
+function extractShareInfo(text){
+  if(!text) return null;
+  // 1) 找链接：取最长的 http(s) 链接
+  const urls = text.match(/https?:\/\/[^\s"'<>，。；、\[\]（）()《》【】]+/gi);
+  let url = "";
+  if(urls && urls.length){
+    url = urls.reduce((a, b) => b.length > a.length ? b : a, "");
+  }
+  if(!url) return null;
+  const pan = detectPanName(url);
+  // 2) 提取码：中文提示语
+  let pwd = "";
+  const m1 = text.match(/提取码[：:\s]*([0-9a-zA-Z]{4,8})/);
+  if(m1) pwd = m1[1];
+  if(!pwd){
+    const m2 = text.match(/(?:密码|访问码|口令)[：:\s]*([0-9a-zA-Z]{4,8})/);
+    if(m2) pwd = m2[1];
+  }
+  // 3) 提取码：URL 参数 pwd
+  if(!pwd){
+    try{
+      const u = new URL(url);
+      const q = u.searchParams.get("pwd") || u.searchParams.get("code") || u.searchParams.get("passcode");
+      if(q) pwd = q;
+    }catch(e){}
+  }
+  // 4) 提取码：链接 # 后的 pwd
+  if(!pwd){
+    const m3 = url.match(/[#&?](?:pwd|code|passcode)=([0-9a-zA-Z]{4,8})/i);
+    if(m3) pwd = m3[1];
+  }
+  return {url, pwd, pan};
+}
+
+/** 用户操作日志：写入会话日志（前缀"操作"，前端可查看 /logs 完整链路） */
+function logOp(msg){
+  try{ fetch("/app/pylog?tag=" + encodeURIComponent("操作") + "&msg=" + encodeURIComponent(msg)); }catch(e){}
+}
+
+/** 读剪贴板并自动填入（只在输入框为空时填，不覆盖手动输入） */
+async function autoFillFromClipboard(silent){
+  try{
+    const text = await readClipboardText();
+    if(!text) return false;
+    const info = extractShareInfo(text);
+    if(!info || !info.url) return false;
+    const urlEl = $("#shareUrl");
+    // 覆盖式填充：识别到剪贴板链接就整体替换输入，避免旧内容残留
+    if(silent && urlEl.value) return false;
+    urlEl.value = info.url;
+    syncUrlWrap();
+    syncParseBtn();
+    const hint = $("#clipHint");
+    if(hint){
+      hint.style.display = "block";
+      hint.textContent = "已从剪贴板识别分享链接，可直接解析";
+    }
+    if(!silent) toast("已识别剪贴板链接", "ok");
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function handleParse(){
+  if(parseBusy) return;
+  const raw = $("#shareUrl").value.trim();
+  logOp("解析: " + raw.slice(0, 80));
+  if(!raw){
+    toast("请先粘贴分享链接", "err");
+    $("#shareUrl").focus();
+    return;
+  }
+  // 磁力/BT 链接：不解析，直接交给内置 Gopeed 下载
+  if(/^magnet:/i.test(raw) || /^ed2k:/i.test(raw) || /^https?:\/\/.*\.torrent/i.test(raw)){
+    parseBusy = true;
+    setParseLoading(true);
+    try{
+      const name = raw.startsWith("magnet:") ? "磁力任务" : "BT任务";
+      logOp("添加下载: " + name + " " + raw.slice(0, 60));
+      await gopeedCreateTask(raw, name, {});
+      toast("已添加到下载", "ok");
+    }catch(err){
+      toast("添加下载失败：" + err.message, "err");
+    }
+    parseBusy = false;
+    setParseLoading(false);
+    return;
+  }
+  // ===== 解析站目录分享链接（新 App 唯一解析入口，免 API Key，链接自带签名）=====
+  const qaiuM = raw.match(/qaiu\.top\/dir\/([A-Za-z0-9]+)/i);
+  if(qaiuM){
+    parseBusy = true;
+    setParseLoading(true);
+    try{
+      const code = qaiuM[1];
+      logOp("解析目录分享: " + raw.slice(0, 80));
+      const data = await apiDirectoryShare(code);
+      const fileList = data && data.fileList;
+      if(!fileList || !fileList.length) throw new Error("该目录分享为空或已失效");
+      currentTree = {
+        rootUrl: raw, rootPwd: "",
+        panType: data.type || "ye",
+        panName: "直链",
+        otherParam: null,
+        items: fileList,
+        selected: new Map(),
+      };
+      treeLoadedKeys = new Set();
+      treeLoadedKeys.add("root");
+      logOp("第一层目录: " + fileList.length + " 项 - " + fileList.map(it => (it.fileName || "")).slice(0, 10).join(", "));
+      prefetchVisibleDirs(fileList); // 点击解析即开始后台多线程预取目录（链式覆盖下一层）
+      renderTree(fileList, $("#resultArea"));
+      currentLinkDetail = null;
+      renderShareDetail();
+      const firstDir = fileList.find(it => (it.fileType || "").toLowerCase() === "folder") || fileList[0];
+      addHistory({url: raw, pwd: "", name: (firstDir && firstDir.fileName) || "目录分享", mode: "dir", panName: "直链"});
+    }catch(err){
+      toast(err.message || "解析失败", "err");
+    }
+    parseBusy = false;
+    setParseLoading(false);
+    return;
+  }
+  // 仅支持解析站目录分享链接
+  toast("请粘贴 189.qaiu.top 目录分享链接", "err");
+  return;
+}
+
+/** 同步开始解析按钮可用态：有输入才可点 */
+function syncParseBtn(){
+  const btn = $("#parseBtn");
+  const txt = $("#parseBtnText");
+  const has = $("#shareUrl").value.trim().length > 0;
+  btn.disabled = !has;
+  txt.textContent = "开始解析";
+  const clearBtn = $("#clearBtn");
+  if(clearBtn){
+    const hasAny = has || $("#resultArea").innerHTML.trim().length > 0;
+    clearBtn.disabled = !hasAny;
+  }
+}
+
+/** 顶部问候语：按当前时间动态显示，切页刷新 + 每分钟自动刷新 */
+function setGreet(){
+  const el = $("#greetText");
+  if(!el) return;
+  const d = new Date();
+  const h = d.getHours();
+  const week = ["日","一","二","三","四","五","六"][d.getDay()];
+  let greet;
+  if(h >= 5 && h < 9) greet = "早上好";
+  else if(h >= 9 && h < 12) greet = "上午好";
+  else if(h >= 12 && h < 14) greet = "中午好";
+  else if(h >= 14 && h < 18) greet = "下午好";
+  else if(h >= 18 && h < 23) greet = "晚上好";
+  else greet = "夜深了";
+  el.textContent = (d.getMonth()+1) + "月" + d.getDate() + "日 · 星期" + week + " · " + greet;
+}
+let greetTimer = null;
+function ensureGreetTimer(){
+  if(greetTimer) return;
+  greetTimer = setInterval(setGreet, 60000);
+}
+
+function setParseLoading(loading){
+  const btn = $("#parseBtn");
+  const txt = $("#parseBtnText");
+  const icon = $("#parseIcon");
+  btn.disabled = loading;
+  if(loading){
+    txt.textContent = "解析中";
+    icon.innerHTML = '<path d="M21 12a9 9 0 1 1-6.22-8.56"/><path d="M21 3v6h-6"/>';
+    icon.classList.add("spin");
+  }else{
+    txt.textContent = "开始解析";
+    icon.classList.remove("spin");
+    icon.innerHTML = '<path d="M12 3v13"/><path d="m5 10 7 7 7-7"/>';
+    syncParseBtn();
+  }
+}
+
+/** 单文件结果渲染 */
+/* ===== 分享详情 ===== */
+function buildShareDetailRows(d){
+  if(!d) return [];
+  const sl = d.shareLinkInfo || {};
+  const rows = [];
+  if(sl.panName) rows.push(["网盘名称", sl.panName]);
+  if(sl.type) rows.push(["网盘标识", sl.type]);
+  if(sl.shareKey) rows.push(["分享Key", sl.shareKey]);
+  if(sl.shareUrl || sl.standardUrl) rows.push(["分享链接", sl.shareUrl || sl.standardUrl]);
+  if(d.apiLink) rows.push(["jsonApi链接", d.apiLink]);
+  if(d.downLink) rows.push(["302下载链接", d.downLink]);
+  // 智能直链2：302 短链 + "/" + 文件名（链接带文件名，便于识别；文件名多级兜底）
+  if(d.downLink){
+    const cr = currentResult || {};
+    let fname = (cr.fileInfo && (cr.fileInfo.fileName || cr.fileInfo.name)) || cr.fileName || cr.name || "";
+    // 目录场景：单文件目录用该文件名；多文件目录优先用已勾选文件，否则用第一个文件
+    if(!fname && currentTree && Array.isArray(currentTree.items)){
+      const files = currentTree.items.filter(it => (it.fileType || "").toLowerCase() !== "folder");
+      if(files.length === 1){
+        fname = files[0].fileName || "";
+      }else if(files.length > 1){
+        const sel = [...(currentTree.selected || new Map()).values()].find(it => (it.fileType || "").toLowerCase() !== "folder");
+        fname = (sel && sel.fileName) || files[0].fileName || "";
+      }
+    }
+    if(fname) rows.push(["智能直链2", d.downLink + "/" + encodeURIComponent(fname)]);
+    else rows.push(["智能直链2", d.downLink]);
+  }
+  if(d.viewLink) rows.push(["302预览链接", d.viewLink]);
+  if(d.checkLink) rows.push(["有效性检查", d.checkLink]);
+  if(d.parserTotal != null) rows.push(["解析次数", String(d.parserTotal)]);
+  if(d.cacheHitTotal != null) rows.push(["缓存命中次数", String(d.cacheHitTotal)]);
+  if(d.sumTotal != null) rows.push(["总请求数", String(d.sumTotal)]);
+  return rows;
+}
+
+function renderShareDetail(){
+  const rows = buildShareDetailRows(currentLinkDetail);
+  if(!rows.length) return;
+  const card = document.createElement("div");
+  card.className = "card share-detail-card";
+  card.innerHTML = `<div class="card-title">分享详情</div><div class="sd-rows"></div>`;
+  const rowsBox = card.querySelector(".sd-rows");
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "sd-row";
+    row.innerHTML = `<span class="sd-label">${escapeHtml(label)}</span><span class="sd-value">${escapeHtml(value)}</span>`;
+    row.addEventListener("click", () => sdCopy(value, label, row));
+    rowsBox.appendChild(row);
+  });
+  $("#resultArea").appendChild(card);
+}
+
+async function sdCopy(text, label, row){
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  row.classList.add("copied");
+  setTimeout(() => row.classList.remove("copied"), 1400);
+  toast("已复制：" + label, "ok");
+}
+
+function renderSingleResult(r){
+  const info = r.fileInfo || {};
+  const [tagCls, tagText] = fileTypeTag(info.fileType);
+  const headers = antiHotlinkHeader(r.panType, r.otherParam);
+  const hasHeader = Object.keys(headers).length > 0;
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `
+    <div class="result-head">
+      <div class="file-icon">${fileTypeIcon(info.fileType)}</div>
+      <div class="file-meta">
+        <div class="file-name">${escapeHtml(info.fileName || "未命名文件")}</div>
+        <div class="file-tags">
+          ${r.panName ? `<span class="tag info">${escapeHtml(r.panName)}</span>` : ""}
+          ${tagCls ? `<span class="tag ${tagCls}">${tagText}</span>` : ""}
+          <span class="tag">${escapeHtml(info.sizeStr || fmtSize(info.size))}</span>
+          ${r.cacheHit ? `<span class="tag ok">缓存命中</span>` : `<span class="tag warn">实时解析</span>`}
+        </div>
+        ${r.expires ? `<div class="dl-meta">有效期至 ${escapeHtml(r.expires)}</div>` : ""}
+      </div>
+    </div>
+    <div class="link-box">
+      <code id="directLink">${escapeHtml(r.directLink || "")}</code>
+      <button class="icon-btn" data-action="copy" title="复制直链">${ICONS.copy}</button>
+    </div>
+    ${hasHeader ? `
+      <div class="hint-box">
+        ${ICONS.alert}
+        <p>该平台有防盗链，下载时已自动附带请求头：
+          ${Object.entries(headers).map(([k,v]) => `<code>${escapeHtml(k)}: ${escapeHtml(v)}</code>`).join(" ")}
+        </p>
+      </div>` : ""}
+    <div class="action-bar">
+      <button class="btn btn-ghost" data-action="reparse">
+        ${ICONS.refresh} 重新解析
+      </button>
+      <button class="btn btn-primary" data-action="download">
+        ${ICONS.down} 发送到 Gopeed
+      </button>
+    </div>`;
+  el.querySelector('[data-action="copy"]').addEventListener("click", () => copyText(r.directLink, el.querySelector('[data-action="copy"]')));
+  el.querySelector('[data-action="reparse"]').addEventListener("click", handleParse);
+  el.querySelector('[data-action="download"]').addEventListener("click", () => downloadToGopeed(r));
+  $("#resultArea").innerHTML = "";
+  $("#resultArea").appendChild(el);
+}
+
+async function downloadToGopeed(r){
+  const url = r.directLink || (r.parserUrl) || "";
+  if(!url){
+    toast("没有可下载的直链", "err");
+    return;
+  }
+  const pan = resolvePan(r.panType, "", r.directLink || r.parserUrl || "");
+  const headers = antiHotlinkHeader(pan, r.otherParam);
+  try{
+    const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam, headers, pan === "uc" ? false : undefined), r.fileInfo?.fileName, headers, pan);
+    logOp("发送下载: " + (r.fileInfo?.fileName || "") + " (#" + id.slice(0, 8) + ")");
+    toast("已发送到 Gopeed，任务 #" + id.slice(0, 8), "ok");
+  }catch(err){
+    if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
+      toast("无法连接内置下载引擎", "err");
+      navigate("mine");
+    }else{
+      toast(err.message, "err");
+    }
+  }
+}
+
+/** 请求头规范化：Referer/User-Agent/Cookie 只保留单一键，避免 Go Header 出现重复值被源站拒绝 */
+function normalizeHeaders(h){
+  const out = {};
+  if(!h) return out;
+  const pick = (keys) => { for(const k of keys){ if(h[k]) return h[k]; } return ""; };
+  const ref = pick(["referer","Referer","REFERER"]);
+  const ua  = pick(["user-agent","User-Agent","USER-AGENT"]);
+  const ck  = pick(["cookie","Cookie","COOKIE"]);
+  if(ref) out["Referer"] = ref;
+  if(ua)  out["User-Agent"] = ua;
+  if(ck)  out["Cookie"] = ck;
+  for(const k in h){
+    if(/^(referer|user-agent|cookie)$/i.test(k)) continue;
+    if(h[k]) out[k] = h[k];
+  }
+  return out;
+}
+
+async function gopeedCreateTask(url, name, headers, pan){
+  const th = settings.threads || 4;
+  // UC/夸克 OSS 直链带回调验证（checkplay），高并发分片会触发回调风暴被拒/挂起，单独限流
+  let conn = th;
+  if(pan === "uc") conn = Math.min(th, 4);
+  else if(pan === "qk") conn = Math.min(th, 8);
+  const body = {
+    req: {
+      url,
+      extra: {
+        method: "",
+        header: normalizeHeaders(headers || {}),
+        body: "",
+      },
+    },
+    opts: {
+      name: name || "",
+      path: "",
+      extra: { connections: conn },
+    },
+  };
+  return await gopeedFetch("/api/v1/tasks", { method: "POST", body });
+}
+
+/* ===== 目录树 ===== */
+async function renderTree(items, container){
+  container.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = "treeCard";
+  container.appendChild(card);
+  const head = document.createElement("div");
+  head.className = "card-title";
+  head.innerHTML = `目录文件 <span class="rule"></span><span class="tag info">${escapeHtml(currentTree.panName || "网盘")}</span>
+    <span class="view-switch">
+      <button data-view="list" class="${viewMode === "list" ? "active" : ""}" title="列表视图">☰</button>
+      <button data-view="grid" class="${viewMode === "grid" ? "active" : ""}" title="图标视图">▦</button>
+    </span>`;
+  card.appendChild(head);
+  const vs = head.querySelector(".view-switch");
+  if(vs) vs.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]");
+    if(b) setViewMode(b.dataset.view);
+  });
+  const summary = document.createElement("div");
+  summary.className = "tree-summary";
+  summary.id = "treeSummary";
+  card.appendChild(summary);
+  const list = document.createElement("div");
+  list.className = "tree";
+  list.id = "treeList";
+  card.appendChild(list);
+  // 文件管理器式浏览：面包屑 + 当前目录内容（默认图标网格，图1 风格）
+  currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
+  renderNavView();
+  renderTreeSummary();
+}
+
+function renderTreeItems(items, list){
+  list.innerHTML = "";
+  list.classList.remove("tree-list", "tree-grid");
+  list.classList.add(viewMode === "grid" ? "tree-grid" : "tree-list");
+  // 布局内联双保险（避免 CSS 特异性问题导致网格不换行）
+  const gridMode0 = viewMode === "grid";
+  list.style.display = "flex";
+  list.style.flexWrap = gridMode0 ? "wrap" : "nowrap";
+  list.style.flexDirection = gridMode0 ? "row" : "column";
+  list.style.gap = gridMode0 ? "10px" : "6px";
+  list.style.alignContent = "flex-start";
+  const seenIds = new Set();
+  const seenFolderNames = new Set();
+  const gridMode = viewMode === "grid";
+  for(const item of items){
+    const idKey = item.fileId || item.parserUrl;
+    const isFolder = (item.fileType || "").toLowerCase() === "folder";
+    // 去重：目录按文件名（服务端可能返回重复目录）；文件按 id
+    if(isFolder){
+      const nm = (item.fileName || "").trim();
+      if(nm && seenFolderNames.has(nm)) continue;
+      if(nm) seenFolderNames.add(nm);
+    }else if(idKey && seenIds.has(idKey)){
+      continue;
+    }
+    if(idKey) seenIds.add(idKey);
+    const node = document.createElement("div");
+    node.className = "tree-item" + (gridMode ? " grid-item" : "")
+      + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
+    node.dataset.key = idKey || "";
+    node._item = item;
+    const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
+    const iconHtml = `<div class="t-icon">${isFolder ? ICONS.folder : fileTypeIcon(item.fileType)}</div>`;
+    const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
+    if(gridMode){
+      // 图标视图：4 列网格卡片（图标 + 名称 + 大小 + 时间），图1 文件管理器风格
+      // 目录不可下载：不渲染下载按钮（点击进入下一层）
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-size">${item.sizeStr ? escapeHtml(item.sizeStr) : tagText}</div>
+          ${tm ? `<div class="t-time">${escapeHtml(tm)}</div>` : ""}
+        </div>
+        ${isFolder ? "" : `<button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`}`;
+    }else{
+      // 列表视图：行（图标 + 名称 + 类型·大小·时间 + 勾选 + 下载）
+      const sub = `${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}${tm ? " · " + escapeHtml(tm) : ""}`;
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-sub">${sub}</div>
+        </div>
+        ${isFolder ? "" : `<div class="t-check">${ICONS.check}</div>`}
+        ${isFolder ? "" : `<button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`}`;
+    }
+    // 点击：目录进入下一层（文件管理器式），文件勾选/下载
+    node.addEventListener("click", (e) => {
+      if(e.target.closest(".t-dl")) return;
+      if(isFolder){
+        enterNavDir(item);
+      }else{
+        toggleSelect(idKey, item);
+      }
+    });
+    const dlBtn = node.querySelector(".t-dl");
+    if(dlBtn) dlBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      downloadFileItem(item);
+    });
+    list.appendChild(node);
+  }
+}
+
+// ========== 视图切换：保留当前导航位置，只重渲染内容 ==========
+function setViewMode(mode){
+  if(viewMode === mode) return;
+  viewMode = mode;
+  localStorage.setItem("nfd_view_mode", mode);
+  $$(".view-switch button").forEach(b => b.classList.toggle("active", b.dataset.view === mode));
+  renderNavView();
+  renderTreeSummary();
+}
+
+// ========== 文件管理器式浏览：面包屑 + 当前目录内容 ==========
+function renderNavView(){
+  const list = $("#treeList");
+  if(!list) return;
+  list.innerHTML = "";
+  list.classList.remove("tree-list", "tree-grid");
+  // 面包屑（单行滚动）
+  const bc = document.createElement("div");
+  bc.className = "nav-breadcrumb";
+  bc.innerHTML = currentTree.navPath.map((p, i) =>
+    `<span class="nav-crumb${i === currentTree.navPath.length - 1 ? " cur" : ""}" data-i="${i}">${escapeHtml(p.name)}</span>`
+  ).join(`<span class="nav-sep">/</span>`);
+  bc.addEventListener("click", (e) => {
+    const c = e.target.closest(".nav-crumb");
+    if(c) goNavTo(Number(c.dataset.i));
+  });
+  list.appendChild(bc);
+  // 自动滚动到最新层级（最右端），进入下一层后新目录名完整可见不被截断
+  requestAnimationFrame(() => { bc.scrollLeft = bc.scrollWidth; });
+  // 内容区
+  const content = document.createElement("div");
+  content.className = "nav-content";
+  content.innerHTML = `<div class="tree-loading">加载中…</div>`;
+  list.appendChild(content);
+  const cur = currentTree.navPath[currentTree.navPath.length - 1];
+  (async () => {
+    let items = null;
+    if(cur.item){
+      // 若该目录正在后台预取中，直接等预取完成（结果已入缓存，秒开）
+      const ck0 = cur.item.parserUrl || "";
+      const pending0 = prefetchJobs.get(ck0);
+      if(pending0){ try{ await pending0; }catch(e){} }
+      items = await fetchDirItems(cur.item);
+      logOp("导航目录: " + (cur.item.fileName || "") + " " + (items ? items.length : 0) + " 项");
+    }else{
+      items = currentTree.items || [];
+    }
+    if(items === null){
+      content.innerHTML = `<div class="tree-empty">无法加载：接口无有效返回</div>`;
+      return;
+    }
+    currentTree.navItems = items;
+    currentTree.navContentEl = content;
+    renderTreeItems(items, content);
+    renderTreeSummary();
+    prefetchVisibleDirs(items); // 后台预取可见子目录，点击秒开
+  })();
+}
+function enterNavDir(item){
+  currentTree.navPath.push({name: item.fileName || "未命名", item});
+  renderNavView();
+}
+function goNavTo(i){
+  if(i < 0 || i >= currentTree.navPath.length) return;
+  currentTree.navPath.length = i + 1;
+  renderNavView();
+}
+// 同一目录的并发请求去重：进行中复用，避免重复请求占隧道（点击+预取只发一次）
+const dirInflight = new Map(); // cacheKey -> Promise
+async function fetchDirItems(item, opts){
+  opts = opts || {};
+  const cacheKey = item.parserUrl || "";
+  const cacheHit = dirCache.get(cacheKey);
+  if(cacheHit && Date.now() - cacheHit.ts < DIR_TTL) return cacheHit.items;
+  const inflight = dirInflight.get(cacheKey);
+  if(inflight) return inflight; // 已有请求在进行，直接复用结果
+  const p = doFetchDirItems(item, opts);
+  dirInflight.set(cacheKey, p);
+  try{ return await p; }finally{ dirInflight.delete(cacheKey); }
+}
+
+async function doFetchDirItems(item, opts){
+  const cacheKey = item.parserUrl || "";
+  const dirId = item.fileId || "";
+  try{
+    const u = new URL(item.parserUrl);
+    let baseLocal = "/parse" + u.pathname + u.search;
+    // 1) 补 API Key（token URL 参数方式；服务端对 URL token 与 X-API-Key 头处理不同）
+    if(!u.searchParams.has("token")){
+      const key2 = parseApiKey();
+      if(key2) baseLocal += (baseLocal.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(key2);
+    }
+    // 2) 补分享密码（带密码链接需独立 pwd 参数）
+    if(currentTree && currentTree.rootPwd && !u.searchParams.has("pwd")){
+      baseLocal += "&pwd=" + encodeURIComponent(currentTree.rootPwd);
+    }
+    // 3) 候选请求：parserUrl 自带 dirId，但部分网盘/服务端不认 dirId，依次尝试常见目录参数名
+    const tries = [baseLocal];
+    const idParam = u.searchParams.get("dirId") || item.fileId || "";
+    if(idParam){
+      for(const pn of ["fileId", "pid", "parentId", "folderId"]){
+        if(!u.searchParams.has(pn)) tries.push(baseLocal + "&" + pn + "=" + encodeURIComponent(idParam));
+      }
+    }
+    // 顶层已渲染 id（过滤父目录混入子列表）
+    const topIds = new Set((currentTree && Array.isArray(currentTree.items))
+      ? currentTree.items.map(it => it.fileId || it.parserUrl).filter(Boolean) : []);
+    let lastDetail = "";
+    for(const local of tries){
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      let resp;
+      try{ resp = await fetch(local, {signal: ctrl.signal}); }
+      catch(e){ clearTimeout(to); lastDetail = "请求超时/失败"; continue; }
+      clearTimeout(to);
+      const text = await resp.text().catch(() => "");
+      if(!resp.ok){
+        lastDetail = "HTTP " + resp.status + " " + text.trim().slice(0, 120);
+        continue;
+      }
+      let json = null;
+      try{ json = JSON.parse(text); }catch(e){}
+      // 兼容多种返回格式
+      let list = null;
+      if(Array.isArray(json)) list = json;
+      else if(json && Array.isArray(json.data)) list = json.data;
+      else if(json && Array.isArray(json.list)) list = json.list;
+      else if(json && Array.isArray(json.files)) list = json.files;
+      const code = (json && typeof json.code !== "undefined") ? Number(json.code) : 200;
+      if(code !== 200 || !list){
+        lastDetail = "code=" + code + " " + ((json && json.msg) || "");
+        continue;
+      }
+      if(!list.length){
+        dirCache.set(cacheKey, {items: [], ts: Date.now()});
+        return [];
+      }
+      // 过滤父目录混入（顶层已渲染的项）
+      const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
+      if(!filtered.length){
+        // 过滤后为空：123 网盘先返回"当前目录自身"作为入口，需用其 parserUrl 再次请求——自动深入
+        const selfItems = list.filter(it => {
+          const id = it.fileId || it.parserUrl;
+          return id && idParam && String(id) === String(idParam);
+        });
+        if(selfItems.length && !(opts.deep >= 3)){
+          const deepItem = selfItems[0];
+          // 防御：自身项 parserUrl 与当前相同则不再递归（避免自引用），兜底返回
+          if(deepItem.parserUrl === cacheKey){
+            dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
+            return selfItems;
+          }
+          if(!opts.silent) logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
+          const deepItems = await fetchDirItems(deepItem, {deep: (opts.deep || 0) + 1});
+          if(deepItems && deepItems.length) dirCache.set(cacheKey, {items: deepItems, ts: Date.now()});
+          return deepItems;
+        }
+        if(selfItems.length){
+          dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
+          if(!opts.silent) logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
+          return selfItems;
+        }
+        lastDetail = "原始 " + list.length + " 项全为顶层重复(" + (item.fileName || "") + ")";
+        continue; // 试下一个参数名
+      }
+      dirCache.set(cacheKey, {items: filtered, ts: Date.now()});
+      if(!opts.silent) logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", ") + " [" + local.slice(-80) + "]");
+      return filtered;
+    }
+    // 全部尝试失败
+    if(!opts.silent) logOp("目录加载失败: " + lastDetail + " dirId=" + (idParam || "无"));
+    return null;
+  }catch(e){
+    if(!opts.silent) logOp("目录加载异常: " + (e && e.message));
+    return null;
+  }
+}
+
+// 后台预取队列池（并发 3 路、链式）：解析完成/渲染目录后把可见文件夹入队，
+// 预取成功自动把其子目录也入队（提前覆盖下一层），用户点击时命中 dirCache 秒开
+let prefetchSeq = 0;
+const prefetchJobs = new Map(); // parserUrl -> Promise（点击目录时可直接等待它完成）
+const prefetchPool = [];        // 待预取队列 {d, seq}
+let poolWorkers = 0;
+function prefetchVisibleDirs(items){
+  const seq = ++prefetchSeq;
+  const dirs = (items || []).filter(it =>
+    (it.fileType || "").toLowerCase() === "folder"
+  ).slice(0, 12);
+  for(const d of dirs) enqueuePrefetch(d, seq);
+}
+function enqueuePrefetch(d, seq){
+  const ck = d.parserUrl || "";
+  if(prefetchJobs.has(ck)) return;           // 正在预取
+  const hit = dirCache.get(ck);
+  if(hit && Date.now() - hit.ts < DIR_TTL) return; // 已有缓存
+  prefetchPool.push({d, seq});
+  kickPrefetchWorker();
+}
+async function kickPrefetchWorker(){
+  if(poolWorkers >= 5) return; // 并发 5 路（多线程预取，隧道上限 50 余量充足）
+  poolWorkers++;
+  try{
+    while(prefetchPool.length){
+      const {d, seq} = prefetchPool.shift();
+      if(seq !== prefetchSeq) continue; // 已切换目录，丢弃旧队列任务
+      const ck = d.parserUrl || "";
+      try{
+        const hit = dirCache.get(ck);
+        if(hit && Date.now() - hit.ts < DIR_TTL) continue;
+        const p = fetchDirItems(d, {deep: 1, silent: true}).catch(() => null);
+        prefetchJobs.set(ck, p);
+        let items2 = null;
+        try{ items2 = await p; }finally{ prefetchJobs.delete(ck); }
+        // 链式：该文件夹预取成功后，把其子目录也入队（提前覆盖下一层，限前 5 个）
+        if(items2 && seq === prefetchSeq){
+          items2.filter(it => (it.fileType || "").toLowerCase() === "folder").slice(0, 5)
+            .forEach(sd => enqueuePrefetch(sd, seq));
+        }
+      }catch(e){ /* 预取失败静默 */ }
+    }
+  }finally{
+    poolWorkers--;
+  }
+}
+
+async function loadFolderChildren(item, wrapper, key, opts){
+  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
+  const items = await fetchDirItems(item, opts);
+  if(items === null){
+    treeLoadedKeys.add(key);
+    wrapper.innerHTML = `<div class="tree-empty">无法加载：接口无有效返回</div>`;
+    return null;
+  }
+  treeLoadedKeys.add(key);
+  renderTreeItems(items, wrapper);
+  renderTreeSummary();
+  return items;
+}
+
+function toggleSelect(idKey, item){
+  if(!idKey) return;
+  if(currentTree.selected.has(idKey)) currentTree.selected.delete(idKey);
+  else currentTree.selected.set(idKey, item);
+  // 更新所有对应行的勾选态
+  $$(".tree-item").forEach(row => {
+    const dl = row.querySelector(".t-dl");
+    if(!dl) return;
+    const rid = dl.dataset.dl;
+    if(rid === idKey) row.classList.toggle("checked", currentTree.selected.has(idKey));
+  });
+  renderTreeSummary();
+}
+
+function collectSelectedItems(){
+  // 勾选集合为 Map（跨层级），直接取 values，排除目录
+  return [...currentTree.selected.values()].filter(it =>
+    (it.fileType || "").toLowerCase() !== "folder"
+  );
+}
+
+function renderTreeSummary(){
+  const sum = $("#treeSummary");
+  if(!sum) return;
+  const n = currentTree.selected.size;
+  // 当前目录文件（不含文件夹）：全选状态判断
+  const files = (currentTree.navItems || []).filter(it =>
+    (it.fileType || "").toLowerCase() !== "folder"
+  );
+  const allSel = files.length > 0 && files.every(it =>
+    currentTree.selected.has(it.fileId || it.parserUrl)
+  );
+  // 单个勾选 → "下载"，多个 → "批量下载 (N)"
+  const dlLabel = n === 1 ? "下载" : `批量下载 (${n})`;
+  sum.innerHTML = `
+    <span>已勾选 <strong>${n}</strong> 项</span>
+    <span class="sum-btns">
+      ${files.length > 0 ? `<button class="btn btn-ghost btn-sm" id="selectAllBtn"${allSel ? " disabled" : ""}>全选</button>` : ""}
+      ${n > 0 ? `<button class="btn btn-ghost btn-sm" id="clearSelBtn">取消</button>` : ""}
+      ${n > 0 ? `<button class="btn btn-primary btn-sm" id="batchDlBtn">${ICONS.down} ${dlLabel}</button>` : ""}
+    </span>`;
+  const dl = $("#batchDlBtn");
+  if(dl) dl.addEventListener("click", batchDownloadSelected);
+  const selAll = $("#selectAllBtn");
+  if(selAll) selAll.addEventListener("click", () => {
+    // 全选当前目录所有文件（文件夹不参与）；清空用"取消"按钮
+    const fs = (currentTree.navItems || []).filter(it =>
+      (it.fileType || "").toLowerCase() !== "folder"
+    );
+    fs.forEach(it => currentTree.selected.set(it.fileId || it.parserUrl, it));
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
+  });
+  const clr = $("#clearSelBtn");
+  if(clr) clr.addEventListener("click", () => {
+    // 取消：清空所有勾选（跨目录）
+    currentTree.selected.clear();
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
+  });
+}
+
+async function batchDownloadSelected(){
+  const items = collectSelectedItems();
+  if(!items.length){ toast("请先勾选文件", "err"); return; }
+  logOp("批量下载 " + items.length + " 个文件");
+  // 逐个获取 parserUrl 并下发（每个文件项按自身 panType 透传防盗链 header）
+  let ok = 0, fail = 0;
+  try{
+    for(const it of items){
+      try{
+        const pan = resolvePan(it.panType, currentTree.panType, it.parserUrl || "");
+        const t = await buildDownloadTarget(it.parserUrl, pan, currentTree.otherParam);
+        await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), it.fileName, t.headers, pan);
+        ok++;
+      }catch(e){ fail++; }
+    }
+    // 下载任务下发完成后清空勾选，避免重复
+    currentTree.selected.clear();
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
+    toast(`已发送 ${ok} 个任务${fail ? "，失败 " + fail + " 个" : ""}`, ok ? "ok" : "err");
+  }catch(err){
+    if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
+      toast("内置下载引擎异常", "err");
+      navigate("mine");
+    }else{
+      toast(err.message, "err");
+    }
+  }
+}
+
+async function downloadFileItem(item){
+  const pan = resolvePan(item.panType, currentTree.panType, item.parserUrl || "");
+  logOp("下载文件: " + (item.fileName || "").slice(0, 60));
+  try{
+    const t = await buildDownloadTarget(item.parserUrl, pan, currentTree.otherParam);
+    await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), item.fileName, t.headers, pan);
+    // 下载成功后取消该文件选中，避免重复下载
+    currentTree.selected.delete(item.fileId || item.parserUrl);
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
+    toast("已发送到 Gopeed", "ok");
+  }catch(err){
+    if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
+      toast("内置下载引擎异常", "err");
+      navigate("mine");
+    }else{
+      toast(err.message, "err");
+    }
+  }
+}
+
+/* ================= 历史 ================= */
+function renderHistory(){
+  const list = $("#historyList");
+  if(!history.length){
+    list.innerHTML = `<div class="empty">${ICONS.box}<p>暂无解析记录<br>解析过的链接会保存在这里</p></div>`;
+    return;
+  }
+  list.innerHTML = "";
+  history.forEach(h => {
+    const row = document.createElement("div");
+    row.className = "history-item";
+    row.innerHTML = `
+      <div class="h-main">
+        <div class="h-name">${escapeHtml(h.name)}</div>
+        <div class="h-sub">${escapeHtml(h.panName || "")} ${h.sizeStr ? " · " + escapeHtml(h.sizeStr) : ""} · ${h.mode === "dir" ? "目录" : "文件"}</div>
+      </div>
+      <div class="h-time">${fmtTime(h.time)}</div>`;
+    row.addEventListener("click", () => {
+      $("#shareUrl").value = h.url;
+      syncUrlWrap();
+      navigate("parse");
+      handleParse();
+    });
+    list.appendChild(row);
+  });
+}
+
+/* ================= 下载管理 ================= */
+let gopeedOnline = null;      // null=未知 true=在线 false=离线
+let gopeedVersion = "";
+let tasks = [];
+let speedHistories = {};      // taskId -> [speed,...]
+let pollTimer = null;
+let taskOpsBusy = new Set();
+
+async function refreshGopeedStatus(quiet){
+  try{
+    const info = await gopeedFetch("/api/v1/info");
+    gopeedOnline = true;
+    gopeedVersion = info?.version || "";
+    if(!gopeedVersion || /^v?dev$/i.test(gopeedVersion)) gopeedVersion = "";
+    renderStatusCard();
+    if(!quiet) toast("内置下载引擎就绪" + (gopeedVersion ? "（v" + gopeedVersion + "）" : ""), "ok");
+    return true;
+  }catch(err){
+    gopeedOnline = false;
+    gopeedVersion = "";
+    renderStatusCard();
+    if(!quiet) toast("内置下载引擎异常：" + err.message, "err");
+    return false;
+  }
+}
+
+function renderStatusCard(){
+  // 顶栏连接指示（v1.2.2 起顶栏已移除，保留兼容空实现）
+  const pill = $("#connPill");
+  if(pill){
+    const pillTxt = $("#connText");
+    if(gopeedOnline === null){
+      pill.className = "conn pending";
+      pillTxt.textContent = "检测中";
+    }else if(gopeedOnline){
+      pill.className = "conn on";
+      pillTxt.textContent = "引擎运行中";
+    }else{
+      pill.className = "conn off";
+      pillTxt.textContent = "引擎异常";
+    }
+  }
+}
+
+let lastTaskSnap = {}; // 下载任务状态快照（id -> {status, done, stallSince}），用于状态变化/卡住日志
+async function refreshTasks(){
+  if(!gopeedOnline) return;
+  try{
+    tasks = await gopeedFetch("/api/v1/tasks") || [];
+  }catch(err){
+    if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
+      gopeedOnline = false;
+      renderStatusCard();
+      renderTasks();
+    }
+    return;
+  }
+  // 下载任务状态变化日志（仅在状态变化/疑似卡住时记录，避免刷屏）
+  try{
+    for(const t of tasks){
+      const id = t.id || "";
+      const st = t.status || "?";
+      const done = (t.progress && t.progress.downloaded) || 0;
+      const speed = (t.progress && t.progress.speed) || 0;
+      const prev = lastTaskSnap[id];
+      const name = (t.name || id).slice(0, 40);
+      if(!prev || prev.status !== st){
+        logOp(`下载任务[${name}] 状态: ${prev ? (prev.status + " → " + st) : ("新建 → " + st)} 已下载=${fmtSize(done)} 速度=${fmtSize(speed)}/s`);
+      }else if(st === "running" && prev.done === done){
+        // 疑似卡住：状态 running 但字节数与上轮相同（速度 0）
+        if(!prev.stallSince) prev.stallSince = Date.now();
+        else if(Date.now() - prev.stallSince >= 10000){
+          logOp(`下载任务[${name}] 疑似卡住: 10秒无进度 已下载=${fmtSize(done)} 速度=0 B/s`);
+          prev.stallSince = Date.now(); // 重置避免每轮重复记录
+        }
+      }else if(prev.stallSince){
+        prev.stallSince = 0; // 进度恢复了，清除卡住标记
+      }
+      lastTaskSnap[id] = { status: st, done, stallSince: prev ? prev.stallSince : 0 };
+    }
+  }catch(e){}
+  // 更新速度历史（仅活跃任务：静止任务波形数据不变，drawWaves 零重绘）
+  tasks.forEach(t => {
+    if(t.status !== "running") return;
+    const id = t.id;
+    if(!speedHistories[id]) speedHistories[id] = [];
+    const arr = speedHistories[id];
+    arr.push(t.progress?.speed || 0);
+    if(arr.length > 40) arr.shift();
+  });
+  // 清理已不存在的任务勾选
+  const alive = new Set(tasks.map(t => t.id));
+  if([...selectedTasks].some(id => !alive.has(id))){
+    [...selectedTasks].forEach(id => { if(!alive.has(id)) selectedTasks.delete(id); });
+    renderBatchBar();
+  }
+  renderTasks();
+  renderBatchBar();
+}
+
+function statusMeta(status){
+  const map = {
+    ready:  ["ready", "等待"],
+    running:["running", "下载中"],
+    pause:  ["pause", "已暂停"],
+    wait:   ["wait", "排队中"],
+    error:  ["error", "出错"],
+    done:   ["done", "已完成"],
+  };
+  return map[status] || ["wait", status || "未知"];
+}
+
+function renderTasks(){
+  const area = $("#tasksArea");
+  if(gopeedOnline === false){
+    area.innerHTML = `<div class="card"><div class="empty">
+      ${ICONS.wifi}
+      <p><span class="emph">内置下载引擎异常</span><br>请重启本 App 后再试。</p>
+      <button class="btn btn-ghost btn-sm" data-goto="mine">去设置</button>
+    </div></div>`;
+    const btn = area.querySelector('[data-goto="mine"]');
+    if(btn) btn.addEventListener("click", () => navigate("mine"));
+    return;
+  }
+  if(gopeedOnline === null){
+    area.innerHTML = `<div class="card"><div class="empty">${ICONS.wifi}<p>正在检测下载引擎…</p></div></div>`;
+    return;
+  }
+  if(!tasks.length){
+    area.innerHTML = `<div class="card"><div class="empty">
+      ${ICONS.box}
+      <p><span class="emph">暂无下载任务</span><br>回到「解析」页，把解析出的直链发送到 Gopeed 即可开始下载。</p>
+      <button class="btn btn-ghost btn-sm" data-goto="parse">去解析</button>
+    </div></div>`;
+    const btn = area.querySelector('[data-goto="parse"]');
+    if(btn) btn.addEventListener("click", () => navigate("parse"));
+    return;
+  }
+  // 增量更新：已存在卡片只更新字段，新增才建卡片，消失才移除（canvas 保留，波形不闪）
+  // 先清除占位（空提示/引擎异常/检测中），避免与任务卡片并存
+  const ph = area.querySelector(":scope > .card:not(.task-card)");
+  if(ph) ph.remove();
+  const sorted = [...tasks].sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
+  const existing = new Map();
+  area.querySelectorAll(".task-card").forEach(c => existing.set(c.dataset.id, c));
+  const seen = new Set();
+  sorted.forEach(t => {
+    seen.add(t.id);
+    const card = existing.get(t.id);
+    if(card) updateTaskCard(card, t);
+    else area.appendChild(renderTaskCard(t));
+  });
+  existing.forEach((card, id) => { if(!seen.has(id)) card.remove(); });
+}
+
+/** 增量更新已有任务卡片：状态变化才动徽章/按钮，进度/速度每次实时更新 */
+function updateTaskCard(card, t){
+  const id = t.id;
+  const [cls, label] = statusMeta(t.status);
+  const total = t.meta?.res?.size || 0;
+  const done = t.progress?.downloaded || 0;
+  const speed = t.progress?.speed || 0;
+  const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+  const eta = speed > 0 && total > done ? Math.ceil((total - done) / speed * 1000) : 0;
+  // 状态变化：更新徽章/进度条样式/操作按钮
+  if(card.dataset.status !== t.status){
+    card.dataset.status = t.status;
+    const badge = card.querySelector(".badge");
+    if(badge){ badge.className = "badge " + cls; badge.textContent = label; }
+    const pbar = card.querySelector(".pbar");
+    if(pbar) pbar.className = "pbar" + (cls === "error" ? " error" : cls === "pause" ? " pause" : "");
+    const ops = card.querySelector(".task-ops");
+    if(ops){
+      ops.innerHTML = "";
+      const opsHtml =
+        (t.status === "done" ? `<button class="op-btn" data-op="open" title="打开/安装">${ICONS.open}</button>` : "") +
+        (t.status === "running" || t.status === "wait" ? `<button class="op-btn" data-op="pause" title="暂停">${ICONS.pause}</button>` : "") +
+        (t.status === "pause" || t.status === "error" ? `<button class="op-btn" data-op="resume" title="继续">${ICONS.resume}</button>` : "") +
+        `<button class="op-btn danger" data-op="delete" title="删除">${ICONS.trash}</button>`;
+      ops.innerHTML = opsHtml;
+      ops.querySelectorAll("[data-op]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if(btn.dataset.op === "open") openTaskFile(id);
+          else taskOp(id, btn.dataset.op);
+        });
+      });
+    }
+  }
+  // 进度条/百分比：实时
+  const bar = card.querySelector(".pbar > div");
+  if(bar) bar.style.width = (t.status === "done" ? 100 : pct) + "%";
+  const pspans = card.querySelectorAll(".task-progress-row span");
+  if(pspans.length >= 2){
+    pspans[0].textContent = fmtSize(done) + " / " + (total > 0 ? fmtSize(total) : "未知");
+    pspans[1].textContent = t.status === "done" ? "100%" : pct + "%";
+  }
+  // 速度/剩余时间：实时
+  const stats = card.querySelector(".task-stats");
+  if(stats){
+    stats.innerHTML =
+      `<span>${escapeHtml(fmtSpeed(speed))}</span>` +
+      (eta ? `<span>剩余 ${fmtDuration(eta)}</span>` : "") +
+      `<span>${escapeHtml(fmtTime(t.createdAt))}</span>`;
+  }
+}
+
+function renderTaskCard(t){
+  const card = document.createElement("div");
+  card.className = "task-card";
+  const [cls, label] = statusMeta(t.status);
+  const total = t.meta?.res?.size || 0;
+  const done = t.progress?.downloaded || 0;
+  const speed = t.progress?.speed || 0;
+  const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+  const eta = speed > 0 && total > done ? Math.ceil((total - done) / speed * 1000) : 0;
+  const id = t.id;
+  card.dataset.id = id;
+  card.innerHTML = `
+    <div class="task-head">
+      <button class="task-check ${selectedTasks.has(id) ? "on" : ""}" data-op="select" title="选择任务">${ICONS.check}</button>
+      <div class="task-name">
+        ${escapeHtml(t.name || "未命名")}
+        <span class="src">${escapeHtml((t.meta?.req?.url || "").slice(0, 120))}</span>
+      </div>
+      <span class="badge ${cls}">${label}</span>
+    </div>
+    <div class="pbar ${cls === "error" ? "error" : cls === "pause" ? "pause" : ""}">
+      <div style="width:${t.status === "done" ? 100 : pct}%"></div>
+    </div>
+    <div class="task-progress-row">
+      <span>${escapeHtml(fmtSize(done))} / ${escapeHtml(total > 0 ? fmtSize(total) : "未知")}</span>
+      <span class="pct">${t.status === "done" ? "100%" : pct + "%"}</span>
+    </div>
+    <canvas class="wave" width="780" height="34"></canvas>
+    <div class="task-foot">
+      <div class="task-stats">
+        <span>${escapeHtml(fmtSpeed(speed))}</span>
+        ${eta ? `<span>剩余 ${fmtDuration(eta)}</span>` : ""}
+        <span>${escapeHtml(fmtTime(t.createdAt))}</span>
+      </div>
+      <div class="task-ops">
+        ${t.status === "done" ? `<button class="op-btn" data-op="open" title="打开/安装">${ICONS.open}</button>` : ""}
+        ${t.status === "running" || t.status === "wait" ? `<button class="op-btn" data-op="pause" title="暂停">${ICONS.pause}</button>` : ""}
+        ${t.status === "pause" || t.status === "error" ? `<button class="op-btn" data-op="resume" title="继续">${ICONS.resume}</button>` : ""}
+        <button class="op-btn danger" data-op="delete" title="删除">${ICONS.trash}</button>
+      </div>
+    </div>`;
+  card.classList.toggle("selected", selectedTasks.has(id));
+  card.querySelectorAll("[data-op]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if(btn.dataset.op === "select"){
+        toggleTaskSelect(id, card, btn);
+      }else if(btn.dataset.op === "open"){
+        openTaskFile(id);
+      }else{
+        taskOp(id, btn.dataset.op);
+      }
+    });
+  });
+  return card;
+}
+
+function toggleTaskSelect(id, card, btn){
+  if(selectedTasks.has(id)){
+    selectedTasks.delete(id);
+    card.classList.remove("selected");
+    btn.classList.remove("on");
+  }else{
+    selectedTasks.add(id);
+    card.classList.add("selected");
+    btn.classList.add("on");
+  }
+  renderBatchBar();
+}
+
+/** 取任务本地文件路径：优先 Gopeed 返回的 files[0].path，兜底用下载目录+文件名 */
+async function getTaskFilePath(t){
+  if(!t) return "";
+  if(t.meta && t.meta.res && t.meta.res.files && t.meta.res.files.length && t.meta.res.files[0].path){
+    return t.meta.res.files[0].path;
+  }
+  if(t.name){
+    let dir = "";
+    try{ const cfg = await gopeedFetch("/api/v1/config"); dir = (cfg && cfg.downloadDir) || ""; }catch(e){}
+    if(dir) return dir.replace(/[\/]+$/, "") + "/" + t.name;
+  }
+  return "";
+}
+
+/** 已完成任务：调起外部应用打开/安装文件 */
+async function openTaskFile(id){
+  const t = tasks.find(x => x.id === id);
+  if(!t) return;
+  const fpath = await getTaskFilePath(t);
+  if(!fpath){ toast("未找到文件路径", "err"); return; }
+  if(!window.AndroidBridge || !window.AndroidBridge.openFile){
+    toast("当前环境不支持打开文件", "err");
+    return;
+  }
+  const r = window.AndroidBridge.openFile(fpath);
+  if(r === "ok"){
+    toast("已调起外部应用", "ok");
+  }else if(r === "needInstallPermission"){
+    toast("已打开系统设置，请允许安装未知应用后重试", "err");
+  }else if(r && r.indexOf("err:") === 0){
+    toast(r.slice(4), "err");
+  }else{
+    toast("打开失败", "err");
+  }
+}
+
+/** 删除任务时同步删除本地文件（下载中/已完成/暂停/出错都会删） */
+async function deleteTaskFile(t){
+  try{
+    if(!t) return;
+    const fpath = await getTaskFilePath(t);
+    if(fpath){
+      await fetch("/delete-file?path=" + encodeURIComponent(fpath));
+    }
+  }catch(e){}
+}
+
+async function taskOp(id, op){
+  if(taskOpsBusy.has(id)) return;
+  taskOpsBusy.add(id);
+  logOp("任务" + op + ": #" + String(id).slice(0, 8));
+  try{
+    if(op === "pause") await gopeedFetch(`/api/v1/tasks/${id}/pause`, { method: "PUT", json: false });
+    else if(op === "resume") await gopeedFetch(`/api/v1/tasks/${id}/continue`, { method: "PUT", json: false });
+    else if(op === "delete"){
+      const t = tasks.find(x => x.id === id);
+      await gopeedFetch(`/api/v1/tasks/${id}?force=true`, { method: "DELETE", json: false });
+      await deleteTaskFile(t);
+    }
+    await refreshTasks();
+  }catch(err){
+    toast(err.message, "err");
+    if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
+      gopeedOnline = false;
+      renderStatusCard();
+    }
+  }finally{
+    taskOpsBusy.delete(id);
+  }
+}
+
+/* 速度波形绘制 */
+function drawWaves(){
+  $$(".wave").forEach(canvas => {
+    const card = canvas.closest(".task-card");
+    if(!card) return;
+    const id = card.dataset.id;
+    const arr = speedHistories[id] || [];
+    const task = tasks.find(t => t.id === id);
+    const key = (task?.status || "") + ":" + arr.length + ":" + (arr[arr.length-1] || 0);
+    if(canvas.dataset.key === key) return; // 数据未变：不重绘（静止任务零开销，不闪）
+    canvas.dataset.key = key;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const max = Math.max(...arr, 1024);
+    const n = arr.length;
+    if(n < 2) return;
+    const color = task?.status === "done" ? "rgba(52,211,153,.75)" :
+                  task?.status === "error" ? "rgba(248,113,113,.75)" :
+                  task?.status === "pause" ? "rgba(251,191,36,.65)" :
+                  "rgba(45,212,191,.8)";
+    ctx.beginPath();
+    arr.forEach((v, i) => {
+      const x = (i / (40 - 1)) * w;
+      const y = h - 3 - (v / max) * (h - 8);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    // 面积
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, color.replace(/[\d.]+\)$/, ".16)"));
+    grad.addColorStop(1, color.replace(/[\d.]+\)$/, "0)"));
+    ctx.fillStyle = grad;
+    ctx.fill();
+  });
+}
+
+/* 批量操作栏（下载页底部） */
+let selectedTasks = new Set();
+function renderBatchBar(){
+  const bar = $("#batchBar");
+  const n = selectedTasks.size;
+  if(!n){
+    bar.innerHTML = "";
+    return;
+  }
+  bar.innerHTML = `
+    <div class="batch-bar">
+      <div class="bb-info">已选 <strong>${n}</strong> 个任务</div>
+      <button class="btn btn-ghost btn-sm" id="batchPause">暂停</button>
+      <button class="btn btn-ghost btn-sm" id="batchResume">继续</button>
+      <button class="btn btn-danger btn-sm" id="batchDelete">删除</button>
+    </div>`;
+  $("#batchPause").addEventListener("click", () => batchOp("pause"));
+  $("#batchResume").addEventListener("click", () => batchOp("resume"));
+  $("#batchDelete").addEventListener("click", () => batchOp("delete"));
+}
+function batchOp(op){
+  [...selectedTasks].forEach(id => taskOp(id, op));
+  selectedTasks.clear();
+}
+
+/* ================= 设置 ================= */
+async function fillSettingsForm(){
+  $("#setThreads").value = settings.threads || 16;
+  $("#setMaxRunning").value = settings.maxRunning || 5;
+  // 节点代理状态（Android 专属：节点默认常启，仅显示实时状态；桌面无 bridge 则隐藏）
+  const npRow = $("#nodeProxyRow");
+  if(npRow){
+    if(window.AndroidBridge){
+      // 节点实时状态（/app/node-status 读 dnode_status.json）
+      async function refreshNodeStatus(){
+        try{
+          const r = await fetch("/app/node-status");
+          const d = await r.json();
+          const el = $("#nodeProxyStatus");
+          if(el && d && d.status){
+            el.textContent = (d.status || "") + (d.ts ? "\n" + d.ts : "");
+            el.style.color = (d.status || "").indexOf("已连接") >= 0 ? "#10b981" : "#8a94a6";
+          }
+        }catch(e){}
+      }
+      setInterval(refreshNodeStatus, 10000);
+      refreshNodeStatus();
+    }else{
+      npRow.style.display = "none";
+    }
+  }
+  // 下载目录从内置引擎读取（持久化于后端），读不到时回退本地
+  let dir = settings.dlDir || "";
+  try{
+    const cfg = await gopeedFetch("/api/v1/config");
+    if(cfg?.downloadDir) dir = cfg.downloadDir;
+  }catch(e){}
+  $("#setDlDir").value = dir;
+}
+
+/** 下载地址统一走本地下载代理：手动跟随跳转并携带 Cookie/Referer/UA（必须是完整 http 地址，Gopeed 不认相对路径） */
+/** 提取当前下载可用的 Cookie：解析返回的 otherParam → 当前结果 → linkInfo 深层递归 */
+function currentDownloadCookie(otherParam){
+  let c = "";
+  if(otherParam && typeof otherParam === "object") c = extractCookie(otherParam) || "";
+  if(!c && currentResult && currentResult.otherParam) c = extractCookie(currentResult.otherParam) || "";
+  if(!c && currentResult && currentResult.fileInfo && currentResult.fileInfo.extParameters){
+    c = extractCookie(currentResult.fileInfo.extParameters) || "";
+  }
+  if(!c && currentResult) c = findCookieDeep(currentResult) || "";
+  if(!c && currentLinkDetail) c = findCookieDeep(currentLinkDetail) || "";
+  return c;
+}
+/** /v2/getFileDownInfo 目录文件下载信息（返回权威直链+downloadHeaders，消耗 1 次额度） */
+async function apiGetFileDownInfo(pan, param, sign){
+  let u = `${PARSER_BASE}/v2/getFileDownInfo/${encodeURIComponent(pan)}/${encodeURIComponent(param)}`;
+  const key = parseApiKey();
+  if(key) u += "?token=" + encodeURIComponent(key);
+  else if(sign) u += "?apiKeySign=" + encodeURIComponent(sign);
+  else throw new Error("NO_KEY");
+  const resp = await fetch(u);
+  const json = await resp.json().catch(() => null);
+  const d = json && json.data;
+  const hdrCount = d && d.downloadHeaders ? Object.keys(d.downloadHeaders).length : 0;
+  try{ await fetch("/log", { method: "POST", headers: { "Content-Type": "text/plain" },
+    body: "getFileDownInfo: pan=" + pan + " param=" + param + " code=" + (json && json.code) + " msg=" + (json && json.msg) + " downloadUrl=" + (d && d.downloadUrl ? "有" : "无") + " headers=" + hdrCount + " 个" }); }catch(e){}
+  if(!json || json.code !== 200) return null;
+  return d || null;
+}
+
+/** 从 parserUrl 提取网盘标识与下载参数（/v2/redirectUrl/{type}/{param}、/d/{type}/{key} 等） */
+/** 从 parserUrl 提取网盘/文件参数，并附带链接自带签名 apiKeySign（免 API Key 换取权威直链） */
+function extractDownInfo(url){
+  const m = (url || "").match(/\/(?:redirectUrl|d|f|json|parser)\/([a-z0-9]+)\/([^\/?]+)/i);
+  if(!m) return null;
+  const sign = (url.match(/[?&]apiKeySign=([^&]+)/) || [])[1] || "";
+  return { pan: m[1], param: m[2], sign };
+}
+
+/** 构建下载目标：优先 getFileDownInfo（链接自带 apiKeySign 免 API Key）拿权威直链 direct 直连
+ *  （123 等 CDN 直链直接可下，无需 302 中转，避免节点到 CDN 部分 IP 不可达），失败回退 parserUrl 走 /dl/ 代理 */
+async function buildDownloadTarget(parserUrl, pan, otherParam){
+  const base = { url: parserUrl, headers: antiHotlinkHeader(pan, otherParam), direct: false };
+  try{
+    const di = extractDownInfo(parserUrl);
+    if(di && di.sign){
+      const info = await apiGetFileDownInfo(di.pan || pan, di.param, di.sign);
+      if(info && info.downloadUrl){
+        const hdrs = Object.assign({}, base.headers, info.downloadHeaders || {});
+        return { url: info.downloadUrl, headers: hdrs, direct: true };
+      }
+    }
+  }catch(e){}
+  return base;
+}
+
+function dlUrl(url, pan, otherParam, headers, direct){
+  // 直连模式：Gopeed 直接下载权威直链（绕过代理转发层，分片由源站直接处理，文件更不易损坏）
+  if(direct) return url;
+  let u = location.origin + "/dl/?url=" + encodeURIComponent(url);
+  if(pan === "fj" && otherParam && otherParam.UA) u += "&ua=" + encodeURIComponent(otherParam.UA);
+  const cookie = currentDownloadCookie(otherParam);
+  if(cookie) u += "&cookie=" + encodeURIComponent(cookie);
+  if(headers && Object.keys(headers).length){
+    u += "&hdr=" + encodeURIComponent(JSON.stringify(normalizeHeaders(headers)));
+  }
+  // 节点代理：123 等网盘 CDN 直链需经节点 SOCKS5 中转下载（设置页配置，可留空直连）
+  const np = settings.nodeProxy;
+  if(np && np.host){
+    u += "&proxy=" + encodeURIComponent(np.host + ":" + (np.port || 1080));
+    if(np.username) u += "&proxyUser=" + encodeURIComponent(np.username);
+    if(np.password) u += "&proxyPass=" + encodeURIComponent(np.password);
+  }
+  return u;
+}
+
+async function saveSettingsForm(){
+  logOp("保存设置: 线程数=" + $("#setThreads").value + " 最大并发=" + $("#setMaxRunning").value);
+  // 节点代理固定使用内置默认节点（设置页不再展示配置项）
+  const th = parseInt($("#setThreads").value, 10);
+  settings.threads = (th >= 1 && th <= 64) ? th : 4;
+  const mr = parseInt($("#setMaxRunning").value, 10);
+  settings.maxRunning = (mr >= 1 && mr <= 20) ? mr : 5;
+  const dir = $("#setDlDir").value.trim();
+  if(dir) settings.dlDir = dir;
+  saveSettings();
+  // 下载目录 / 并发数同步到内置引擎（运行中即时生效）
+  try{
+    const cfg = (await gopeedFetch("/api/v1/config")) || {};
+    cfg.downloadDir = dir;
+    cfg.maxRunning = settings.maxRunning;
+    await gopeedFetch("/api/v1/config", { method: "PUT", body: cfg });
+    // 持久化到 App 配置（下次启动生效）
+    await fetch("/app/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ downloadDir: dir }),
+    });
+    toast("设置已保存并生效", "ok");
+  }catch(err){
+    toast("设置已保存，但引擎配置同步失败：" + err.message, "err");
+  }
+  refreshGopeedStatus(true);
+}
+
+/* ================= 路由 ================= */
+function navigate(route){
+  if(!["parse","history","downloads","mine"].includes(route)) route = "parse";
+  location.hash = "/" + route;
+}
+function applyRoute(){
+  const route = (location.hash.replace(/^#\/?/, "") || "parse");
+  const valid = ["parse","history","downloads","mine"].includes(route) ? route : "parse";
+  $$(".view").forEach(v => v.classList.toggle("active", v.dataset.route === valid));
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === valid));
+  if(valid === "downloads"){
+    refreshGopeedStatus(true);
+    refreshTasks();
+    startPolling();
+  }else{
+    stopPolling();
+  }
+  if(valid === "parse"){
+    setGreet();
+    ensureGreetTimer();
+  }
+  if(valid === "history"){
+    renderHistory();
+  }
+  if(valid === "mine") fillSettingsForm();
+}
+function startPolling(){
+  if(pollTimer) return;
+  let active = true;
+  const tick = async () => {
+    await refreshTasks();
+    active = tasks.some(t => ["running","wait","ready"].includes(t.status));
+    schedule(active ? 1000 : 30000);
+  };
+  function schedule(ms){ pollTimer = setTimeout(tick, ms); }
+  schedule(active ? 3000 : 30000);
+}
+function stopPolling(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+}
+
+/* ================= 复制 ================= */
+async function copyText(text, btn){
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  if(btn){
+    btn.classList.add("copied");
+    setTimeout(() => btn.classList.remove("copied"), 1400);
+  }
+  toast("已复制直链", "ok");
+}
+
+/* ================= 输入框 ================= */
+function syncUrlWrap(){
+  const wrap = $("#urlWrap");
+  if(!wrap) return;
+  const has = $("#shareUrl").value.length > 0;
+  wrap.classList.toggle("has-value", has);
+}
+
+/* ================= 事件绑定 ================= */
+function bindEvents(){
+  $$(".tab").forEach(t => t.addEventListener("click", () => navigate(t.dataset.tab)));
+  $("#parseBtn").addEventListener("click", handleParse);
+  const clearBtnEl = $("#clearBtn");
+  if(clearBtnEl) clearBtnEl.addEventListener("click", () => {
+    $("#shareUrl").value = "";
+    $("#resultArea").innerHTML = "";
+    const hint = $("#clipHint");
+    if(hint) hint.style.display = "none";
+    currentTree = null;
+    currentResult = null;
+    currentLinkDetail = null;
+    syncParseBtn();
+    $("#shareUrl").focus();
+  });
+  $("#clipBtn").addEventListener("click", async () => {
+    logOp("读取剪贴板");
+    const ok = await autoFillFromClipboard(false);
+    if(!ok) toast("剪贴板中未识别到分享链接", "err");
+  });
+  // 输入变化：同步按钮可用态 + 从文本中自动识别网盘链接/提取码/平台
+  $("#shareUrl").addEventListener("input", () => {
+    syncParseBtn();
+    const v = $("#shareUrl").value.trim();
+    if(!v) return;
+    const info = extractShareInfo(v);
+    if(!info || !info.url) return;
+    // 输入是整段文本（非纯 URL）时，回填为识别出的链接
+    if(!/^https?:\/\//i.test(v)){
+      $("#shareUrl").value = info.url;
+      showClipHint("已识别：" + (info.pan || "网盘") + "分享链接" + (info.pwd ? "，提取码已自动填入" : ""));
+    }
+  });
+  $("#shareUrl").addEventListener("input", syncUrlWrap);
+  const urlClearEl = $("#urlClear");
+  if(urlClearEl) urlClearEl.addEventListener("click", () => {
+    $("#shareUrl").value = "";
+    $("#shareUrl").focus();
+    syncUrlWrap();
+  });
+  $("#shareUrl").addEventListener("keydown", e => { if(e.key === "Enter") handleParse(); });
+
+  $("#saveBtn").addEventListener("click", saveSettingsForm);
+  // 检测引擎：只检测内置引擎状态，不触发保存
+  $("#testConnBtn").addEventListener("click", async () => {
+    await refreshGopeedStatus(false);
+  });
+
+  $("#logsBtn").addEventListener("click", openLogsModal);
+  $("#logsRefresh").addEventListener("click", loadLogs);
+  $("#logsCopy").addEventListener("click", copyLogs);
+  $("#logsClose").addEventListener("click", () => { $("#logsModal").style.display = "none"; });
+  $("#logsModal").addEventListener("click", e => { if(e.target === $("#logsModal")) $("#logsModal").style.display = "none"; });
+
+  $("#historyClear").addEventListener("click", () => {
+    history = [];
+    saveHistory();
+    renderHistory();
+    toast("历史已清空", "ok");
+  });
+
+  window.addEventListener("hashchange", applyRoute);
+}
+
+/* ================= 运行日志 ================= */
+function openLogsModal(){
+  $("#logsModal").style.display = "flex";
+  loadLogs();
+}
+async function loadLogs(){
+  const pre = $("#logsContent");
+  pre.textContent = "加载中…";
+  try{
+    const resp = await fetch("/logs");
+    const txt = await resp.text();
+    pre.textContent = txt || "(空)";
+    // 完整日志可能很长，自动滚动到最新（底部）
+    pre.scrollTop = pre.scrollHeight;
+  }catch(e){
+    pre.textContent = "读取日志失败: " + e;
+  }
+}
+function copyLogs(){
+  const txt = $("#logsContent").textContent;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(() => toast("日志已复制", "ok")).catch(() => toast("复制失败，请长按选择复制", "err"));
+  }else{
+    toast("当前环境不支持一键复制，请长按选择复制", "err");
+  }
+}
+
+/* ================= 初始化 ================= */
+function init(){
+  bindEvents();
+  syncUrlWrap();
+  renderHistory();
+  applyRoute();
+  if(!location.hash) navigate("parse");
+  // 首次进入自动检测连接（静默）
+  setTimeout(() => refreshGopeedStatus(true), 400);
+  setGreet();
+  syncParseBtn();
+  // 波形绘制循环（节流）：仅下载页且前台时绘制，后台/其他页零开销；
+  // 数据未变的任务（已完成/暂停/出错）不重绘 → 波形不闪、静止零开销
+  setInterval(() => {
+    if(document.hidden) return;
+    const r = (location.hash.replace(/^#\/?/, "") || "parse");
+    if(r !== "downloads") return;
+    drawWaves();
+  }, 500);
+}
+
+init();
+</script>
+</body>
+</html>
