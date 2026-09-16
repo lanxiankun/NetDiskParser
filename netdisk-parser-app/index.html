@@ -567,6 +567,7 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
 .sd-label{width:96px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--text-2);line-height:1.55;padding-top:1px}
 .sd-value{flex:1;font-size:12.5px;color:var(--text);word-break:break-all;line-height:1.55}
 .sum-btns{display:inline-flex;gap:6px;flex-wrap:wrap}
+.btn:disabled{opacity:.45;pointer-events:none}
 .tree-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between;padding:8px 12px;font-size:12.5px;color:var(--text-3)}
 </style>
 </head>
@@ -1750,6 +1751,10 @@ function renderNavView(){
   (async () => {
     let items = null;
     if(cur.item){
+      // 若该目录正在后台预取中，直接等预取完成（结果已入缓存，秒开）
+      const ck0 = cur.item.parserUrl || "";
+      const pending0 = prefetchJobs.get(ck0);
+      if(pending0){ try{ await pending0; }catch(e){} }
       items = await fetchDirItems(cur.item);
       logOp("导航目录: " + (cur.item.fileName || "") + " " + (items ? items.length : 0) + " 项");
     }else{
@@ -1870,23 +1875,30 @@ async function fetchDirItems(item, opts){
   }
 }
 
-// 后台预取当前目录前 N 个文件夹内容（静默、串行），用户点击时命中 dirCache 秒开
+// 后台预取当前目录前 N 个文件夹内容（静默、并发 3 路），用户点击时命中 dirCache 秒开
 let prefetchSeq = 0;
+const prefetchJobs = new Map(); // parserUrl -> Promise（点击目录时可直接等待它完成）
 async function prefetchVisibleDirs(items){
   const seq = ++prefetchSeq;
   const dirs = (items || []).filter(it =>
     (it.fileType || "").toLowerCase() === "folder"
-  ).slice(0, 6);
+  ).slice(0, 8);
   if(!dirs.length) return;
-  for(const d of dirs){
-    if(seq !== prefetchSeq) return; // 已切换目录，停止本次预取
-    try{
+  let i = 0;
+  const worker = async () => {
+    while(i < dirs.length && seq === prefetchSeq){
+      const d = dirs[i++];
       const ck = d.parserUrl || "";
-      const hit = dirCache.get(ck);
-      if(hit && Date.now() - hit.ts < DIR_TTL) continue;
-      await fetchDirItems(d, {deep: 1, silent: true});
-    }catch(e){ /* 预取失败静默 */ }
-  }
+      try{
+        const hit = dirCache.get(ck);
+        if(hit && Date.now() - hit.ts < DIR_TTL) continue;
+        const p = fetchDirItems(d, {deep: 1, silent: true}).catch(() => null);
+        prefetchJobs.set(ck, p);
+        try{ await p; }finally{ prefetchJobs.delete(ck); }
+      }catch(e){ /* 预取失败静默 */ }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]); // 并发 3 路
 }
 
 async function loadFolderChildren(item, wrapper, key, opts){
@@ -1940,7 +1952,7 @@ function renderTreeSummary(){
   sum.innerHTML = `
     <span>已勾选 <strong>${n}</strong> 项</span>
     <span class="sum-btns">
-      ${files.length > 0 ? `<button class="btn btn-ghost btn-sm" id="selectAllBtn">${allSel ? "取消全选" : "全选"}</button>` : ""}
+      ${files.length > 0 ? `<button class="btn btn-ghost btn-sm" id="selectAllBtn"${allSel ? " disabled" : ""}>全选</button>` : ""}
       ${n > 0 ? `<button class="btn btn-ghost btn-sm" id="clearSelBtn">取消</button>` : ""}
       ${n > 0 ? `<button class="btn btn-primary btn-sm" id="batchDlBtn">${ICONS.down} ${dlLabel}</button>` : ""}
     </span>`;
@@ -1948,17 +1960,11 @@ function renderTreeSummary(){
   if(dl) dl.addEventListener("click", batchDownloadSelected);
   const selAll = $("#selectAllBtn");
   if(selAll) selAll.addEventListener("click", () => {
+    // 全选当前目录所有文件（文件夹不参与）；清空用"取消"按钮
     const fs = (currentTree.navItems || []).filter(it =>
       (it.fileType || "").toLowerCase() !== "folder"
     );
-    const all = fs.length > 0 && fs.every(it => currentTree.selected.has(it.fileId || it.parserUrl));
-    if(all){
-      // 取消全选：移除当前目录所有文件的勾选
-      fs.forEach(it => currentTree.selected.delete(it.fileId || it.parserUrl));
-    }else{
-      // 全选当前目录所有文件
-      fs.forEach(it => currentTree.selected.set(it.fileId || it.parserUrl, it));
-    }
+    fs.forEach(it => currentTree.selected.set(it.fileId || it.parserUrl, it));
     if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
     renderTreeSummary();
   });
