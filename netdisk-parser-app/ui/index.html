@@ -2727,14 +2727,21 @@ async function buildDownloadTarget(parserUrl, pan, otherParam){
 }
 
 function dlUrl(url, pan, otherParam, headers, direct){
-  // 直连模式：Gopeed 直接下载权威直链（绕过代理转发层，分片由源站直接处理，文件更不易损坏）
-  if(direct) return url;
+  // 统一走本地代理（/dl/）：Gopeed 只连 127.0.0.1 稳定通道，切换网络不影响任务状态，
+  // 防盗链头、节点中转、302 重试与断点续传由代理层处理，避免直连外网时断网误判完成
   let u = location.origin + "/dl/?url=" + encodeURIComponent(url);
   if(pan === "fj" && otherParam && otherParam.UA) u += "&ua=" + encodeURIComponent(otherParam.UA);
   const cookie = currentDownloadCookie(otherParam);
   if(cookie) u += "&cookie=" + encodeURIComponent(cookie);
   if(headers && Object.keys(headers).length){
     u += "&hdr=" + encodeURIComponent(JSON.stringify(normalizeHeaders(headers)));
+  }
+  // 节点代理：123 等网盘 CDN 直链需经节点 SOCKS5 中转下载（设置页配置）
+  const np = settings.nodeProxy;
+  if(np && np.host){
+    u += "&proxy=" + encodeURIComponent(np.host + ":" + (np.port || 1080));
+    if(np.username) u += "&proxyUser=" + encodeURIComponent(np.username);
+    if(np.password) u += "&proxyPass=" + encodeURIComponent(np.password);
   }
   return u;
 }
