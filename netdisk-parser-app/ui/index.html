@@ -170,6 +170,52 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 }
 .rule{flex:1;height:1px;background:var(--border-soft);margin:0 10px}
 
+/* ===== 视图切换 ===== */
+.view-switch{display:inline-flex;gap:3px;margin-left:auto}
+.view-switch button{width:28px;height:25px;border:1px solid var(--border-soft);background:var(--surface-2);color:var(--text-2);border-radius:6px;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:all .15s}
+.view-switch button:hover{color:var(--text)}
+.view-switch button.active{color:#fff;background:var(--accent);border-color:var(--accent)}
+/* 图标视图（文件管理器 4 列网格卡片：图标+名称+大小+时间，图1 风格） */
+.nav-content.tree-grid{display:flex !important;flex-direction:row !important;flex-wrap:wrap !important;gap:10px !important;align-content:flex-start}
+.nav-content.tree-list{display:flex !important;flex-direction:column !important;gap:6px !important}
+.tree-grid .tree-item{flex:0 0 calc(25% - 8px);width:calc(25% - 8px);min-width:72px;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:10px 4px 8px;position:relative;cursor:pointer}
+@media (min-width:520px){ .tree-grid .tree-item{flex-basis:calc(20% - 8px);width:calc(20% - 8px)} }
+@media (min-width:720px){ .tree-grid .tree-item{flex-basis:calc(16.66% - 8px);width:calc(16.66% - 8px)} }
+.tree-grid .tree-item .t-icon{width:44px;height:44px;border-radius:11px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:24px;height:24px}
+.tree-grid .tree-item .t-main{width:100%;min-width:0}
+.tree-grid .tree-item .t-name{font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;font-weight:550}
+.tree-grid .tree-item .t-size{font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-time{font-size:10px;color:var(--text-3);opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-check{display:none}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:5px;top:5px;padding:2px 6px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+.tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
+.tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-grid .tree-item.folder .t-name{color:var(--warn)}
+.tree-grid .tree-item.folder .t-icon svg{stroke:var(--warn)}
+.tree-grid .tree-item .t-icon{width:46px;height:46px;border-radius:11px;flex:none}
+.tree-grid .tree-item .t-icon svg{width:25px;height:25px}
+.tree-grid .tree-item .t-main{width:100%;min-width:0}
+.tree-grid .tree-item .t-name{font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;font-weight:550}
+.tree-grid .tree-item .t-size{font-size:11px;color:var(--text-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-time{font-size:10.5px;color:var(--text-3);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-grid .tree-item .t-check{display:none}
+.tree-grid .tree-item .t-dl{display:none;position:absolute;right:6px;top:6px;padding:3px 7px;font-size:11px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer}
+.tree-grid .tree-item:hover .t-dl, .tree-grid .tree-item.checked .t-dl{display:block}
+.tree-grid .tree-item.checked{border-color:var(--accent);background:var(--accent-dim)}
+.tree-grid .tree-item.folder .t-name{color:var(--warn)}
+.tree-grid .tree-item.folder .t-icon svg{stroke:var(--warn)}
+/* 详情视图 */
+.tree-detail .tree-item{padding:12px 14px}
+.tree-detail .tree-item .t-name{font-size:14px}
+.tree-detail .tree-item .t-sub{font-size:12px;margin-top:3px}
+.nav-breadcrumb{display:flex;align-items:center;gap:3px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.nav-breadcrumb::-webkit-scrollbar{display:none}
+.nav-crumb{flex:0 0 auto;color:var(--sky);cursor:pointer;padding:1px 4px;border-radius:5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-crumb.cur{flex:0 0 auto;color:var(--text);font-weight:650;cursor:default}
+.nav-sep{flex:0 0 auto;color:var(--text-3)}
+.nav-content{display:flex;flex-direction:column;gap:6px}
+
 /* ===== 表单（设置） ===== */
 .set-group{margin-bottom:16px}
 .set-group-title{font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:9px;letter-spacing:.4px}
@@ -520,6 +566,9 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
 .sd-row.copied .sd-label{color:var(--ok)}
 .sd-label{width:96px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--text-2);line-height:1.55;padding-top:1px}
 .sd-value{flex:1;font-size:12.5px;color:var(--text);word-break:break-all;line-height:1.55}
+.sum-btns{display:inline-flex;gap:6px;flex-wrap:wrap}
+.btn:disabled{opacity:.45;pointer-events:none}
+.tree-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between;padding:8px 12px;font-size:12.5px;color:var(--text-3)}
 </style>
 </head>
 <body>
@@ -560,6 +609,10 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="parseIcon"><path d="M12 3v13"/><path d="m5 10 7 7 7-7"/></svg>
           <span id="parseBtnText">开始解析</span>
         </button>
+        <button class="btn-ghost2" id="dirShareBtn" disabled title="把当前分享链接生成目录分享页（/dir/xxx），需已填写解析 API Key">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>
+          分享文件夹
+        </button>
       </div>
     </div>
 
@@ -585,18 +638,6 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
 
   <!-- 下载视图 -->
   <section class="view" data-route="downloads">
-    <div class="card status-card" id="gopeedStatus">
-      <div class="status-ring">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m5 10 7 7 7-7"/><path d="M4 21h16"/></svg>
-      </div>
-      <div class="status-main">
-        <div class="status-title" id="gopeedStatusTitle">内置下载引擎</div>
-        <div class="status-sub" id="gopeedStatusSub">Gopeed 已内置于本 App，启动即用</div>
-      </div>
-      <div class="status-act">
-        <button class="btn btn-ghost btn-sm" id="gopeedRefresh">刷新</button>
-      </div>
-    </div>
     <div id="batchBar"></div>
     <div id="tasksArea"></div>
   </section>
@@ -613,11 +654,10 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
             <input id="setApiKey" type="password" autocomplete="off" placeholder="注册后于用户面板获取">
           </div>
         </div>
-        <p class="set-note">解析每次消耗 1 次额度；目录列表与链接详情不消耗。Key 仅保存在本浏览器本地。</p>
+
       </div>
 
       <div class="set-group">
-        <div class="set-group-title">下载引擎 · 内置 Gopeed</div>
         <div class="field">
           <label for="setDlDir">下载目录</label>
           <div class="input-wrap">
@@ -649,7 +689,6 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
             <span id="nodeProxyStatus" style="font-size:12px;color:#8a94a6;max-width:150px;text-align:right;white-space:pre-line"></span>
           </div>
         </div>
-        <p class="set-note">下载引擎已内置在本程序中，随 App 启动运行，无需单独安装。下载目录填写本机绝对路径，保存后立即生效。</p>
       </div>
 
       <div style="display:flex;gap:10px">
@@ -723,6 +762,23 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
       </div>
     </div>
     <pre id="logsContent" class="logs-pre">加载中…</pre>
+  </div>
+</div>
+
+<!-- 目录分享弹窗 -->
+<div id="dirShareModal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <b>目录分享已生成</b>
+      <div class="btns">
+        <button class="btn btn-ghost btn-sm" id="dirShareClose">关闭</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="field-hint">分享链接（任何人可打开浏览目录并下载）：</p>
+      <div class="ds-link-box" id="dirShareUrl"></div>
+      <button class="btn btn-primary btn-sm" id="dirShareCopy">复制链接</button>
+    </div>
   </div>
 </div>
 
@@ -870,6 +926,47 @@ function parseApiKey(){
     return null;
   }
   return key;
+}
+
+/** 分享文件夹：把当前分享链接生成目录分享页（/dir/xxx），需解析站 API Key */
+async function createDirShare(){
+  const key = parseApiKey();
+  if(!key) return;
+  const raw = $("#shareUrl").value.trim();
+  if(!raw){ toast("请先粘贴分享链接", "err"); return; }
+  const info = extractShareInfo(raw);
+  const url = (info && info.url) || raw;
+  let pwd = $("#sharePwd").value.trim();
+  if(!pwd && info && info.pwd) pwd = info.pwd;
+  if(!/^https?:\/\//i.test(url)){
+    toast("未识别到有效的网盘链接", "err");
+    return;
+  }
+  logOp("分享文件夹: " + url.slice(0, 80));
+  const btn = $("#dirShareBtn");
+  if(btn) btn.disabled = true;
+  try{
+    const api = PARSER_BASE + "/v2/directoryShare/create?url=" + encodeURIComponent(url) +
+                "&pwd=" + encodeURIComponent(pwd || "") + "&token=" + encodeURIComponent(key);
+    const resp = await fetch(api);
+    const j = await resp.json().catch(() => null);
+    const d = j && j.data ? j.data : j;
+    if(d && d.url){
+      $("#dirShareUrl").textContent = d.url;
+      $("#dirShareModal").style.display = "flex";
+      logOp("目录分享生成: " + d.url);
+      toast("目录分享页已生成", "ok");
+    }else{
+      const msg = (j && j.msg) || "分享文件夹失败";
+      toast(msg, "err");
+      logOp("分享文件夹失败: " + msg);
+    }
+  }catch(e){
+    toast("分享文件夹失败：" + e.message, "err");
+    logOp("分享文件夹异常: " + e.message);
+  }finally{
+    syncParseBtn();
+  }
 }
 
 /** /json/parser 单文件解析 */
@@ -1111,6 +1208,9 @@ let currentResult = null;      // 当前解析结果（单文件）
 let currentTree = null;        // 当前目录树 {rootUrl, rootPwd, panType, items, selected:Map}
 let currentLinkDetail = null;  // 当前分享详情（linkInfo.data，渲染"分享详情"卡片）
 let treeLoadedKeys = new Set(); // 已加载的目录 key
+let viewMode = localStorage.getItem("nfd_view_mode") || "grid"; // 视图: list/grid（文件管理器式浏览）
+const dirCache = new Map(); // 目录结果缓存: parserUrl -> {items, ts}（60s，自动深入结果也缓存）
+const DIR_TTL = 60 * 1000;
 
 /* ================= 剪贴板识别 ================= */
 function readClipboardText(){
@@ -1201,6 +1301,11 @@ function extractShareInfo(text){
   return {url, pwd, pan};
 }
 
+/** 用户操作日志：写入会话日志（前缀"操作"，前端可查看 /logs 完整链路） */
+function logOp(msg){
+  try{ fetch("/app/pylog?tag=" + encodeURIComponent("操作") + "&msg=" + encodeURIComponent(msg)); }catch(e){}
+}
+
 /** 读剪贴板并自动填入（只在输入框为空时填，不覆盖手动输入） */
 async function autoFillFromClipboard(silent){
   try{
@@ -1232,6 +1337,7 @@ async function autoFillFromClipboard(silent){
 async function handleParse(){
   if(parseBusy) return;
   const raw = $("#shareUrl").value.trim();
+  logOp("解析: " + raw.slice(0, 80));
   if(!raw){
     toast("请先粘贴分享链接", "err");
     $("#shareUrl").focus();
@@ -1243,6 +1349,7 @@ async function handleParse(){
     setParseLoading(true);
     try{
       const name = raw.startsWith("magnet:") ? "磁力任务" : "BT任务";
+      logOp("添加下载: " + name + " " + raw.slice(0, 60));
       await gopeedCreateTask(raw, name, {});
       toast("已添加到下载", "ok");
     }catch(err){
@@ -1288,10 +1395,14 @@ async function handleParse(){
       };
       treeLoadedKeys = new Set();
       treeLoadedKeys.add("root");
+      logOp("第一层目录: " + fileList.length + " 项 - " + fileList.map(it => (it.fileName || "")).slice(0, 10).join(", "));
+      prefetchVisibleDirs(fileList); // 点击解析即开始后台多线程预取目录（链式覆盖下一层）
       renderTree(fileList, $("#resultArea"));
       currentLinkDetail = linkInfo;
       renderShareDetail();
-      addHistory({url, pwd, name: (linkInfo?.shareLinkInfo?.panName || "网盘") + " 目录", mode: "dir", panName: linkInfo?.shareLinkInfo?.panName || ""});
+      // 历史记录用第一层目录名（根目录第一个文件夹），找不到才回退"网盘名 目录"
+      const firstDir = fileList.find(it => (it.fileType || "").toLowerCase() === "folder") || fileList[0];
+      addHistory({url, pwd, name: (firstDir && firstDir.fileName) || ((linkInfo?.shareLinkInfo?.panName || "网盘") + " 目录"), mode: "dir", panName: linkInfo?.shareLinkInfo?.panName || ""});
       autoSaveCookie(linkInfo, fileList);
     }else{
       // 单文件模式
@@ -1333,6 +1444,8 @@ function syncParseBtn(){
     const hasAny = has || $("#sharePwd").value.trim().length > 0 || $("#resultArea").innerHTML.trim().length > 0;
     clearBtn.disabled = !hasAny;
   }
+  const dsBtn = $("#dirShareBtn");
+  if(dsBtn) dsBtn.disabled = !has;
 }
 
 /** 顶部问候语：按当前时间动态显示，切页刷新 + 每分钟自动刷新 */
@@ -1501,6 +1614,7 @@ async function downloadToGopeed(r){
   const headers = antiHotlinkHeader(pan, r.otherParam);
   try{
     const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam, headers, pan === "uc" ? false : undefined), r.fileInfo?.fileName, headers, pan);
+    logOp("发送下载: " + (r.fileInfo?.fileName || "") + " (#" + id.slice(0, 8) + ")");
     toast("已发送到 Gopeed，任务 #" + id.slice(0, 8), "ok");
   }catch(err){
     if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
@@ -1563,8 +1677,17 @@ async function renderTree(items, container){
   container.appendChild(card);
   const head = document.createElement("div");
   head.className = "card-title";
-  head.innerHTML = `目录文件 <span class="rule"></span><span class="tag info">${escapeHtml(currentTree.panName || "网盘")}</span>`;
+  head.innerHTML = `目录文件 <span class="rule"></span><span class="tag info">${escapeHtml(currentTree.panName || "网盘")}</span>
+    <span class="view-switch">
+      <button data-view="list" class="${viewMode === "list" ? "active" : ""}" title="列表视图">☰</button>
+      <button data-view="grid" class="${viewMode === "grid" ? "active" : ""}" title="图标视图">▦</button>
+    </span>`;
   card.appendChild(head);
+  const vs = head.querySelector(".view-switch");
+  if(vs) vs.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]");
+    if(b) setViewMode(b.dataset.view);
+  });
   const summary = document.createElement("div");
   summary.className = "tree-summary";
   summary.id = "treeSummary";
@@ -1573,37 +1696,80 @@ async function renderTree(items, container){
   list.className = "tree";
   list.id = "treeList";
   card.appendChild(list);
-  renderTreeItems(items, list);
+  // 文件管理器式浏览：面包屑 + 当前目录内容（默认图标网格，图1 风格）
+  currentTree.navPath = [{name: currentTree.panName || "根目录", item: null}];
+  renderNavView();
   renderTreeSummary();
 }
 
 function renderTreeItems(items, list){
   list.innerHTML = "";
+  list.classList.remove("tree-list", "tree-grid");
+  list.classList.add(viewMode === "grid" ? "tree-grid" : "tree-list");
+  // 布局内联双保险（避免 CSS 特异性问题导致网格不换行）
+  const gridMode0 = viewMode === "grid";
+  list.style.display = "flex";
+  list.style.flexWrap = gridMode0 ? "wrap" : "nowrap";
+  list.style.flexDirection = gridMode0 ? "row" : "column";
+  list.style.gap = gridMode0 ? "10px" : "6px";
+  list.style.alignContent = "flex-start";
+  const seenIds = new Set();
+  const seenFolderNames = new Set();
+  const gridMode = viewMode === "grid";
   for(const item of items){
-    const isFolder = (item.fileType || "").toLowerCase() === "folder";
     const idKey = item.fileId || item.parserUrl;
+    const isFolder = (item.fileType || "").toLowerCase() === "folder";
+    // 去重：目录按文件名（服务端可能返回重复目录）；文件按 id
+    if(isFolder){
+      const nm = (item.fileName || "").trim();
+      if(nm && seenFolderNames.has(nm)) continue;
+      if(nm) seenFolderNames.add(nm);
+    }else if(idKey && seenIds.has(idKey)){
+      continue;
+    }
+    if(idKey) seenIds.add(idKey);
     const node = document.createElement("div");
-    node.className = "tree-item" + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
+    node.className = "tree-item" + (gridMode ? " grid-item" : "")
+      + (currentTree.selected.has(idKey) ? " checked" : "") + (isFolder ? " folder" : "");
+    node.dataset.key = idKey || "";
+    node._item = item;
     const [tagCls, tagText] = isFolder ? [null, "目录"] : fileTypeTag(item.fileType);
-    node.innerHTML = `
-      ${isFolder ? `<div class="t-icon">${ICONS.folder}</div>` : `<div class="t-icon">${fileTypeIcon(item.fileType)}</div>`}
-      <div class="t-main">
-        <div class="t-name">${escapeHtml(item.fileName)}</div>
-        <div class="t-sub">${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}</div>
-      </div>
-      <div class="t-check">${ICONS.check}</div>
-      <button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`;
-    // 点击行 = 勾选
+    const iconHtml = `<div class="t-icon">${isFolder ? ICONS.folder : fileTypeIcon(item.fileType)}</div>`;
+    const tm = item.updateTime || item.mtime || item.dateStr || item.time || "";
+    if(gridMode){
+      // 图标视图：4 列网格卡片（图标 + 名称 + 大小 + 时间），图1 文件管理器风格
+      // 目录不可下载：不渲染下载按钮（点击进入下一层）
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-size">${item.sizeStr ? escapeHtml(item.sizeStr) : tagText}</div>
+          ${tm ? `<div class="t-time">${escapeHtml(tm)}</div>` : ""}
+        </div>
+        ${isFolder ? "" : `<button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down}</button>`}`;
+    }else{
+      // 列表视图：行（图标 + 名称 + 类型·大小·时间 + 勾选 + 下载）
+      const sub = `${tagText}${item.sizeStr ? " · " + escapeHtml(item.sizeStr) : ""}${tm ? " · " + escapeHtml(tm) : ""}`;
+      node.innerHTML = `
+        ${iconHtml}
+        <div class="t-main">
+          <div class="t-name">${escapeHtml(item.fileName)}</div>
+          <div class="t-sub">${sub}</div>
+        </div>
+        ${isFolder ? "" : `<div class="t-check">${ICONS.check}</div>`}
+        ${isFolder ? "" : `<button class="btn btn-ghost btn-sm t-dl" data-dl="${escapeHtml(idKey)}">${ICONS.down} 下载</button>`}`;
+    }
+    // 点击：目录进入下一层（文件管理器式），文件勾选/下载
     node.addEventListener("click", (e) => {
       if(e.target.closest(".t-dl")) return;
       if(isFolder){
-        toggleFolder(node, item);
+        enterNavDir(item);
       }else{
         toggleSelect(idKey, item);
       }
     });
     const dlBtn = node.querySelector(".t-dl");
-    dlBtn.addEventListener("click", (e) => {
+    if(dlBtn) dlBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       downloadFileItem(item);
     });
@@ -1611,47 +1777,244 @@ function renderTreeItems(items, list){
   }
 }
 
-async function toggleFolder(node, item){
-  const key = item.fileId || item.parserUrl;
-  node.classList.toggle("open");
-  let child = node.nextElementSibling;
-  if(child && child.classList.contains("tree-children")){
-    if(node.classList.contains("open")){
-      child.style.display = "flex";
-      if(!treeLoadedKeys.has(key) && !child.dataset.loading){
-        child.dataset.loading = "1";
-        await loadFolderChildren(item, child, key);
-      }
-    }else{
-      child.style.display = "none";
-    }
-    return;
-  }
-  if(!node.classList.contains("open")) return;
-  const wrapper = document.createElement("div");
-  wrapper.className = "tree-children";
-  wrapper.innerHTML = `<div class="tree-loading">加载子目录…</div>`;
-  node.after(wrapper);
-  await loadFolderChildren(item, wrapper, key);
+// ========== 视图切换：保留当前导航位置，只重渲染内容 ==========
+function setViewMode(mode){
+  if(viewMode === mode) return;
+  viewMode = mode;
+  localStorage.setItem("nfd_view_mode", mode);
+  $$(".view-switch button").forEach(b => b.classList.toggle("active", b.dataset.view === mode));
+  renderNavView();
+  renderTreeSummary();
 }
 
-async function loadFolderChildren(item, wrapper, key){
-  try{
-    // parserUrl 为 189.qaiu.top 的短链地址，转本地代理访问
-    const u = new URL(item.parserUrl);
-    const local = "/parse" + u.pathname + u.search;
-    const resp = await fetch(local);
-    const json = await resp.json().catch(() => null);
-    if(!json || json.code !== 200 || !Array.isArray(json.data) || !json.data.length){
-      wrapper.innerHTML = `<div class="tree-empty">空目录或无法加载</div>`;
+// ========== 文件管理器式浏览：面包屑 + 当前目录内容 ==========
+function renderNavView(){
+  const list = $("#treeList");
+  if(!list) return;
+  list.innerHTML = "";
+  list.classList.remove("tree-list", "tree-grid");
+  // 面包屑（单行滚动）
+  const bc = document.createElement("div");
+  bc.className = "nav-breadcrumb";
+  bc.innerHTML = currentTree.navPath.map((p, i) =>
+    `<span class="nav-crumb${i === currentTree.navPath.length - 1 ? " cur" : ""}" data-i="${i}">${escapeHtml(p.name)}</span>`
+  ).join(`<span class="nav-sep">/</span>`);
+  bc.addEventListener("click", (e) => {
+    const c = e.target.closest(".nav-crumb");
+    if(c) goNavTo(Number(c.dataset.i));
+  });
+  list.appendChild(bc);
+  // 自动滚动到最新层级（最右端），进入下一层后新目录名完整可见不被截断
+  requestAnimationFrame(() => { bc.scrollLeft = bc.scrollWidth; });
+  // 内容区
+  const content = document.createElement("div");
+  content.className = "nav-content";
+  content.innerHTML = `<div class="tree-loading">加载中…</div>`;
+  list.appendChild(content);
+  const cur = currentTree.navPath[currentTree.navPath.length - 1];
+  (async () => {
+    let items = null;
+    if(cur.item){
+      // 若该目录正在后台预取中，直接等预取完成（结果已入缓存，秒开）
+      const ck0 = cur.item.parserUrl || "";
+      const pending0 = prefetchJobs.get(ck0);
+      if(pending0){ try{ await pending0; }catch(e){} }
+      items = await fetchDirItems(cur.item);
+      logOp("导航目录: " + (cur.item.fileName || "") + " " + (items ? items.length : 0) + " 项");
+    }else{
+      items = currentTree.items || [];
+    }
+    if(items === null){
+      content.innerHTML = `<div class="tree-empty">无法加载：接口无有效返回</div>`;
       return;
     }
-    treeLoadedKeys.add(key);
-    renderTreeItems(json.data, wrapper);
+    currentTree.navItems = items;
+    currentTree.navContentEl = content;
+    renderTreeItems(items, content);
     renderTreeSummary();
+    prefetchVisibleDirs(items); // 后台预取可见子目录，点击秒开
+  })();
+}
+function enterNavDir(item){
+  currentTree.navPath.push({name: item.fileName || "未命名", item});
+  renderNavView();
+}
+function goNavTo(i){
+  if(i < 0 || i >= currentTree.navPath.length) return;
+  currentTree.navPath.length = i + 1;
+  renderNavView();
+}
+// 同一目录的并发请求去重：进行中复用，避免重复请求占隧道（点击+预取只发一次）
+const dirInflight = new Map(); // cacheKey -> Promise
+async function fetchDirItems(item, opts){
+  opts = opts || {};
+  const cacheKey = item.parserUrl || "";
+  const cacheHit = dirCache.get(cacheKey);
+  if(cacheHit && Date.now() - cacheHit.ts < DIR_TTL) return cacheHit.items;
+  const inflight = dirInflight.get(cacheKey);
+  if(inflight) return inflight; // 已有请求在进行，直接复用结果
+  const p = doFetchDirItems(item, opts);
+  dirInflight.set(cacheKey, p);
+  try{ return await p; }finally{ dirInflight.delete(cacheKey); }
+}
+
+async function doFetchDirItems(item, opts){
+  const cacheKey = item.parserUrl || "";
+  const dirId = item.fileId || "";
+  try{
+    const u = new URL(item.parserUrl);
+    let baseLocal = "/parse" + u.pathname + u.search;
+    // 1) 补 API Key（token URL 参数方式；服务端对 URL token 与 X-API-Key 头处理不同）
+    if(!u.searchParams.has("token")){
+      const key2 = parseApiKey();
+      if(key2) baseLocal += (baseLocal.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(key2);
+    }
+    // 2) 补分享密码（带密码链接需独立 pwd 参数）
+    if(currentTree && currentTree.rootPwd && !u.searchParams.has("pwd")){
+      baseLocal += "&pwd=" + encodeURIComponent(currentTree.rootPwd);
+    }
+    // 3) 候选请求：parserUrl 自带 dirId，但部分网盘/服务端不认 dirId，依次尝试常见目录参数名
+    const tries = [baseLocal];
+    const idParam = u.searchParams.get("dirId") || item.fileId || "";
+    if(idParam){
+      for(const pn of ["fileId", "pid", "parentId", "folderId"]){
+        if(!u.searchParams.has(pn)) tries.push(baseLocal + "&" + pn + "=" + encodeURIComponent(idParam));
+      }
+    }
+    // 顶层已渲染 id（过滤父目录混入子列表）
+    const topIds = new Set((currentTree && Array.isArray(currentTree.items))
+      ? currentTree.items.map(it => it.fileId || it.parserUrl).filter(Boolean) : []);
+    let lastDetail = "";
+    for(const local of tries){
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      let resp;
+      try{ resp = await fetch(local, {signal: ctrl.signal}); }
+      catch(e){ clearTimeout(to); lastDetail = "请求超时/失败"; continue; }
+      clearTimeout(to);
+      const text = await resp.text().catch(() => "");
+      if(!resp.ok){
+        lastDetail = "HTTP " + resp.status + " " + text.trim().slice(0, 120);
+        continue;
+      }
+      let json = null;
+      try{ json = JSON.parse(text); }catch(e){}
+      // 兼容多种返回格式
+      let list = null;
+      if(Array.isArray(json)) list = json;
+      else if(json && Array.isArray(json.data)) list = json.data;
+      else if(json && Array.isArray(json.list)) list = json.list;
+      else if(json && Array.isArray(json.files)) list = json.files;
+      const code = (json && typeof json.code !== "undefined") ? Number(json.code) : 200;
+      if(code !== 200 || !list){
+        lastDetail = "code=" + code + " " + ((json && json.msg) || "");
+        continue;
+      }
+      if(!list.length){
+        dirCache.set(cacheKey, {items: [], ts: Date.now()});
+        return [];
+      }
+      // 过滤父目录混入（顶层已渲染的项）
+      const filtered = list.filter(it => !topIds.has(it.fileId || it.parserUrl));
+      if(!filtered.length){
+        // 过滤后为空：123 网盘先返回"当前目录自身"作为入口，需用其 parserUrl 再次请求——自动深入
+        const selfItems = list.filter(it => {
+          const id = it.fileId || it.parserUrl;
+          return id && idParam && String(id) === String(idParam);
+        });
+        if(selfItems.length && !(opts.deep >= 3)){
+          const deepItem = selfItems[0];
+          // 防御：自身项 parserUrl 与当前相同则不再递归（避免自引用），兜底返回
+          if(deepItem.parserUrl === cacheKey){
+            dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
+            return selfItems;
+          }
+          if(!opts.silent) logOp("目录返回: 仅当前目录自身，自动深入 " + (deepItem.fileName || ""));
+          const deepItems = await fetchDirItems(deepItem, {deep: (opts.deep || 0) + 1});
+          if(deepItems && deepItems.length) dirCache.set(cacheKey, {items: deepItems, ts: Date.now()});
+          return deepItems;
+        }
+        if(selfItems.length){
+          dirCache.set(cacheKey, {items: selfItems, ts: Date.now()});
+          if(!opts.silent) logOp("目录返回: 仅当前目录自身(兜底) - " + selfItems.map(it => (it.fileName || "")).slice(0, 5).join(", "));
+          return selfItems;
+        }
+        lastDetail = "原始 " + list.length + " 项全为顶层重复(" + (item.fileName || "") + ")";
+        continue; // 试下一个参数名
+      }
+      dirCache.set(cacheKey, {items: filtered, ts: Date.now()});
+      if(!opts.silent) logOp("目录返回: " + filtered.length + " 项 - " + filtered.map(it => (it.fileName || "")).slice(0, 8).join(", ") + " [" + local.slice(-80) + "]");
+      return filtered;
+    }
+    // 全部尝试失败
+    if(!opts.silent) logOp("目录加载失败: " + lastDetail + " dirId=" + (idParam || "无"));
+    return null;
   }catch(e){
-    wrapper.innerHTML = `<div class="tree-empty">加载失败：${escapeHtml(e.message)}</div>`;
+    if(!opts.silent) logOp("目录加载异常: " + (e && e.message));
+    return null;
   }
+}
+
+// 后台预取队列池（并发 3 路、链式）：解析完成/渲染目录后把可见文件夹入队，
+// 预取成功自动把其子目录也入队（提前覆盖下一层），用户点击时命中 dirCache 秒开
+let prefetchSeq = 0;
+const prefetchJobs = new Map(); // parserUrl -> Promise（点击目录时可直接等待它完成）
+const prefetchPool = [];        // 待预取队列 {d, seq}
+let poolWorkers = 0;
+function prefetchVisibleDirs(items){
+  const seq = ++prefetchSeq;
+  const dirs = (items || []).filter(it =>
+    (it.fileType || "").toLowerCase() === "folder"
+  ).slice(0, 12);
+  for(const d of dirs) enqueuePrefetch(d, seq);
+}
+function enqueuePrefetch(d, seq){
+  const ck = d.parserUrl || "";
+  if(prefetchJobs.has(ck)) return;           // 正在预取
+  const hit = dirCache.get(ck);
+  if(hit && Date.now() - hit.ts < DIR_TTL) return; // 已有缓存
+  prefetchPool.push({d, seq});
+  kickPrefetchWorker();
+}
+async function kickPrefetchWorker(){
+  if(poolWorkers >= 5) return; // 并发 5 路（多线程预取，隧道上限 50 余量充足）
+  poolWorkers++;
+  try{
+    while(prefetchPool.length){
+      const {d, seq} = prefetchPool.shift();
+      if(seq !== prefetchSeq) continue; // 已切换目录，丢弃旧队列任务
+      const ck = d.parserUrl || "";
+      try{
+        const hit = dirCache.get(ck);
+        if(hit && Date.now() - hit.ts < DIR_TTL) continue;
+        const p = fetchDirItems(d, {deep: 1, silent: true}).catch(() => null);
+        prefetchJobs.set(ck, p);
+        let items2 = null;
+        try{ items2 = await p; }finally{ prefetchJobs.delete(ck); }
+        // 链式：该文件夹预取成功后，把其子目录也入队（提前覆盖下一层，限前 5 个）
+        if(items2 && seq === prefetchSeq){
+          items2.filter(it => (it.fileType || "").toLowerCase() === "folder").slice(0, 5)
+            .forEach(sd => enqueuePrefetch(sd, seq));
+        }
+      }catch(e){ /* 预取失败静默 */ }
+    }
+  }finally{
+    poolWorkers--;
+  }
+}
+
+async function loadFolderChildren(item, wrapper, key, opts){
+  logOp("加载目录: " + (item.fileName || "") + " " + (item.parserUrl || "").slice(0, 200));
+  const items = await fetchDirItems(item, opts);
+  if(items === null){
+    treeLoadedKeys.add(key);
+    wrapper.innerHTML = `<div class="tree-empty">无法加载：接口无有效返回</div>`;
+    return null;
+  }
+  treeLoadedKeys.add(key);
+  renderTreeItems(items, wrapper);
+  renderTreeSummary();
+  return items;
 }
 
 function toggleSelect(idKey, item){
@@ -1679,16 +2042,47 @@ function renderTreeSummary(){
   const sum = $("#treeSummary");
   if(!sum) return;
   const n = currentTree.selected.size;
+  // 当前目录文件（不含文件夹）：全选状态判断
+  const files = (currentTree.navItems || []).filter(it =>
+    (it.fileType || "").toLowerCase() !== "folder"
+  );
+  const allSel = files.length > 0 && files.every(it =>
+    currentTree.selected.has(it.fileId || it.parserUrl)
+  );
+  // 单个勾选 → "下载"，多个 → "批量下载 (N)"
+  const dlLabel = n === 1 ? "下载" : `批量下载 (${n})`;
   sum.innerHTML = `
     <span>已勾选 <strong>${n}</strong> 项</span>
-    ${n > 0 ? `<button class="btn btn-primary btn-sm" id="batchDlBtn">${ICONS.down} 批量下载 (${n})</button>` : ""}`;
-  const btn = $("#batchDlBtn");
-  if(btn) btn.addEventListener("click", batchDownloadSelected);
+    <span class="sum-btns">
+      ${files.length > 0 ? `<button class="btn btn-ghost btn-sm" id="selectAllBtn"${allSel ? " disabled" : ""}>全选</button>` : ""}
+      ${n > 0 ? `<button class="btn btn-ghost btn-sm" id="clearSelBtn">取消</button>` : ""}
+      ${n > 0 ? `<button class="btn btn-primary btn-sm" id="batchDlBtn">${ICONS.down} ${dlLabel}</button>` : ""}
+    </span>`;
+  const dl = $("#batchDlBtn");
+  if(dl) dl.addEventListener("click", batchDownloadSelected);
+  const selAll = $("#selectAllBtn");
+  if(selAll) selAll.addEventListener("click", () => {
+    // 全选当前目录所有文件（文件夹不参与）；清空用"取消"按钮
+    const fs = (currentTree.navItems || []).filter(it =>
+      (it.fileType || "").toLowerCase() !== "folder"
+    );
+    fs.forEach(it => currentTree.selected.set(it.fileId || it.parserUrl, it));
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
+  });
+  const clr = $("#clearSelBtn");
+  if(clr) clr.addEventListener("click", () => {
+    // 取消：清空所有勾选（跨目录）
+    currentTree.selected.clear();
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
+  });
 }
 
 async function batchDownloadSelected(){
   const items = collectSelectedItems();
   if(!items.length){ toast("请先勾选文件", "err"); return; }
+  logOp("批量下载 " + items.length + " 个文件");
   // 逐个获取 parserUrl 并下发（每个文件项按自身 panType 透传防盗链 header）
   let ok = 0, fail = 0;
   try{
@@ -1700,6 +2094,10 @@ async function batchDownloadSelected(){
         ok++;
       }catch(e){ fail++; }
     }
+    // 下载任务下发完成后清空勾选，避免重复
+    currentTree.selected.clear();
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
     toast(`已发送 ${ok} 个任务${fail ? "，失败 " + fail + " 个" : ""}`, ok ? "ok" : "err");
   }catch(err){
     if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
@@ -1713,9 +2111,14 @@ async function batchDownloadSelected(){
 
 async function downloadFileItem(item){
   const pan = resolvePan(item.panType, currentTree.panType, item.parserUrl || "");
+  logOp("下载文件: " + (item.fileName || "").slice(0, 60));
   try{
     const t = await buildDownloadTarget(item.parserUrl, pan, currentTree.otherParam);
     await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), item.fileName, t.headers, pan);
+    // 下载成功后取消该文件选中，避免重复下载
+    currentTree.selected.delete(item.fileId || item.parserUrl);
+    if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
+    renderTreeSummary();
     toast("已发送到 Gopeed", "ok");
   }catch(err){
     if(/Failed to fetch|NetworkError|load failed/i.test(err.message)){
@@ -1796,24 +2199,6 @@ function renderStatusCard(){
       pill.className = "conn off";
       pillTxt.textContent = "引擎异常";
     }
-  }
-  // 下载页状态卡
-  const card = $("#gopeedStatus");
-  const title = $("#gopeedStatusTitle");
-  const sub = $("#gopeedStatusSub");
-  card.classList.remove("on","off","pending");
-  if(gopeedOnline === null){
-    card.classList.add("pending");
-    title.textContent = "检测中…";
-    sub.textContent = "内置下载引擎";
-  }else if(gopeedOnline){
-    card.classList.add("on");
-    title.textContent = "内置下载引擎运行中" + (gopeedVersion ? " · v" + gopeedVersion : "");
-    sub.textContent = "Gopeed 已内置于本 App，下载无需任何额外安装";
-  }else{
-    card.classList.add("off");
-    title.textContent = "内置下载引擎异常";
-    sub.textContent = "请重启本 App";
   }
 }
 
@@ -2073,6 +2458,7 @@ async function deleteTaskFile(t){
 async function taskOp(id, op){
   if(taskOpsBusy.has(id)) return;
   taskOpsBusy.add(id);
+  logOp("任务" + op + ": #" + String(id).slice(0, 8));
   try{
     if(op === "pause") await gopeedFetch(`/api/v1/tasks/${id}/pause`, { method: "PUT", json: false });
     else if(op === "resume") await gopeedFetch(`/api/v1/tasks/${id}/continue`, { method: "PUT", json: false });
@@ -2262,6 +2648,7 @@ function dlUrl(url, pan, otherParam, headers, direct){
 }
 
 async function saveSettingsForm(){
+  logOp("保存设置: 线程数=" + $("#setThreads").value + " 最大并发=" + $("#setMaxRunning").value);
   settings.apiKey = $("#setApiKey").value.trim();
   const th = parseInt($("#setThreads").value, 10);
   settings.threads = (th >= 1 && th <= 64) ? th : 4;
@@ -2361,6 +2748,15 @@ function syncUrlWrap(){
 function bindEvents(){
   $$(".tab").forEach(t => t.addEventListener("click", () => navigate(t.dataset.tab)));
   $("#parseBtn").addEventListener("click", handleParse);
+  $("#dirShareBtn").addEventListener("click", createDirShare);
+  $("#dirShareClose").addEventListener("click", () => { $("#dirShareModal").style.display = "none"; });
+  $("#dirShareCopy").addEventListener("click", () => {
+    const url = $("#dirShareUrl").textContent;
+    if(url){
+      navigator.clipboard.writeText(url).then(() => toast("已复制目录分享链接", "ok")).catch(() => {});
+    }
+  });
+  $("#dirShareModal").addEventListener("click", e => { if(e.target === $("#dirShareModal")) $("#dirShareModal").style.display = "none"; });
   const clearBtnEl = $("#clearBtn");
   if(clearBtnEl) clearBtnEl.addEventListener("click", () => {
     $("#shareUrl").value = "";
@@ -2375,6 +2771,7 @@ function bindEvents(){
     $("#shareUrl").focus();
   });
   $("#clipBtn").addEventListener("click", async () => {
+    logOp("读取剪贴板");
     const ok = await autoFillFromClipboard(false);
     if(!ok) toast("剪贴板中未识别到分享链接", "err");
   });
@@ -2409,7 +2806,6 @@ function bindEvents(){
   $("#testConnBtn").addEventListener("click", async () => {
     await refreshGopeedStatus(false);
   });
-  $("#gopeedRefresh").addEventListener("click", () => refreshGopeedStatus(true));
 
   $("#logsBtn").addEventListener("click", openLogsModal);
   $("#logsRefresh").addEventListener("click", loadLogs);
