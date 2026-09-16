@@ -848,6 +848,14 @@ function loadSettings(){
 }
 function saveSettings(){
   localStorage.setItem(LS_KEY, JSON.stringify(settings));
+  // 双写：API Key 同步到 Go 侧配置（私有目录 app.json），App 退出/清后台后不丢
+  try{
+    fetch("/app/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: settings.apiKey || "" })
+    });
+  }catch(e){}
 }
 function loadHistory(){
   try{
@@ -2967,6 +2975,18 @@ function init(){
   setTimeout(() => refreshGopeedStatus(true), 400);
   setGreet();
   syncParseBtn();
+  // 从 Go 侧配置恢复设置（WebView localStorage 被清/丢失时兜底）
+  fetch("/app/config").then(r => r.json()).then(cfg => {
+    let changed = false;
+    if(cfg.apiKey && !settings.apiKey){ settings.apiKey = cfg.apiKey; changed = true; }
+    if(cfg.downloadDir && !settings.dlDir){ settings.dlDir = cfg.downloadDir; changed = true; }
+    if(changed){
+      localStorage.setItem(LS_KEY, JSON.stringify(settings));
+      const k = $("#setApiKey"); if(k) k.value = settings.apiKey || "";
+      const d = $("#setDlDir"); if(d) d.value = settings.dlDir || "";
+      syncParseBtn();
+    }
+  }).catch(()=>{});
   // 波形绘制循环（节流）：仅下载页且前台时绘制，后台/其他页零开销；
   // 数据未变的任务（已完成/暂停/出错）不重绘 → 波形不闪、静止零开销
   setInterval(() => {

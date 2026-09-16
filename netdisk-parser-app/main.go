@@ -42,6 +42,7 @@ const (
 type appConfig struct {
 	DownloadDir string `json:"downloadDir"`
 	QuarkCookie string `json:"quarkCookie,omitempty"`
+	ApiKey      string `json:"apiKey,omitempty"`
 }
 
 var gopeedPort int
@@ -49,6 +50,7 @@ var serverAddr string
 var appConfigPath string
 var appLogPath string
 var quarkCookie string // 夸克 Cookie（设置页保存，下载代理自动携带）
+var apiKey string      // 解析 API Key（设置页保存，持久化到 app.json，退出后不丢）
 
 var logMu sync.Mutex
 
@@ -851,19 +853,34 @@ func appConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, cfg)
 	case http.MethodPost:
-		var cfg appConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
-		if cfg.DownloadDir == "" {
-			cfg.DownloadDir = defaultDownloadDir("")
+		// 合并保存：只更新本次提交的字段，避免不同入口互相覆盖
+		old := appConfig{}
+		if b, err := os.ReadFile(cfgPath); err == nil {
+			_ = json.Unmarshal(b, &old)
 		}
-		quarkCookie = cfg.QuarkCookie
+		if v, ok := body["downloadDir"].(string); ok && v != "" {
+			old.DownloadDir = v
+		}
+		if v, ok := body["quarkCookie"].(string); ok {
+			old.QuarkCookie = v
+		}
+		if v, ok := body["apiKey"].(string); ok {
+			old.ApiKey = v
+		}
+		if old.DownloadDir == "" {
+			old.DownloadDir = defaultDownloadDir("")
+		}
+		quarkCookie = old.QuarkCookie
+		apiKey = old.ApiKey
 		_ = os.MkdirAll(filepath.Dir(cfgPath), 0o755)
-		b, _ := json.Marshal(cfg)
+		b, _ := json.Marshal(old)
 		_ = os.WriteFile(cfgPath, b, 0o644)
-		writeJSON(w, map[string]string{"status": "ok", "downloadDir": cfg.DownloadDir})
+		writeJSON(w, map[string]string{"status": "ok", "downloadDir": old.DownloadDir})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
