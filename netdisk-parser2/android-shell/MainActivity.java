@@ -22,6 +22,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.graphics.Color;
 import android.util.Log;
@@ -38,6 +39,7 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
     private static final String TAG = "NetDiskParser2";
     private static final int REQ_STORAGE = 1001;
+    private static final int REQ_DIR = 1003;
 
     static {
         try {
@@ -376,6 +378,21 @@ public class MainActivity extends Activity {
                 return "err:" + t.getMessage();
             }
         }
+
+        /** 打开系统目录选择器（SAF）：用户选文件夹后回调 window.__dirPicked(真实路径)；取消则无回调 */
+        @JavascriptInterface
+        public void chooseDir() {
+            try {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+                activity.startActivityForResult(intent, REQ_DIR);
+            } catch (Throwable t) {
+                Log.w(TAG, "打开目录选择器失败: " + t);
+            }
+        }
     }
 
     /** 主线程启动外部打开 Intent（静态嵌套类，绕开 d8 匿名类限制） */
@@ -460,6 +477,77 @@ public class MainActivity extends Activity {
         public void run() {
             Log.i(TAG, "加载 http://127.0.0.1:18090/");
             activity.webView.loadUrl("http://127.0.0.1:18090/");
+        }
+    }
+
+    /** 目录选择结果：SAF tree Uri → 真实路径 → 回填前端 window.__dirPicked */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_DIR || resultCode != RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        Uri tree = data.getData();
+        String path = treeUriToPath(tree);
+        if (path == null) {
+            Log.w(TAG, "目录选择器: 无法解析路径");
+            return;
+        }
+        try {
+            getContentResolver().takePersistableUriPermission(tree,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        } catch (Throwable t) {
+            Log.w(TAG, "持久授权失败: " + t);
+        }
+        String js = "window.__dirPicked && window.__dirPicked(" + org.json.JSONObject.quote(path) + ");";
+        if (webView != null) {
+            runOnUiThread(new DirPickRun(webView, js));
+        }
+    }
+
+    /** SAF tree Uri → 真实文件路径：primary:相对路径 → /storage/emulated/0/相对路径 */
+    private String treeUriToPath(Uri tree) {
+        try {
+            String docId = DocumentsContract.getTreeDocumentId(tree);
+            if (docId == null) {
+                return null;
+            }
+            String[] parts = docId.split(":", 2);
+            String volume = parts[0];
+            String rel = parts.length > 1 ? parts[1] : "";
+            String base;
+            if ("primary".equals(volume)) {
+                base = Environment.getExternalStorageDirectory().getAbsolutePath();
+            } else {
+                base = "/storage/" + volume;
+            }
+            if (rel.isEmpty()) {
+                return base;
+            }
+            return base + "/" + rel;
+        } catch (Throwable t) {
+            Log.w(TAG, "treeUriToPath 失败: " + t);
+            return null;
+        }
+    }
+
+    /** 主线程把选中的目录路径回填给前端（静态嵌套类，绕开 d8 匿名类限制） */
+    private static class DirPickRun implements Runnable {
+        private final WebView webView;
+        private final String js;
+
+        DirPickRun(WebView webView, String js) {
+            this.webView = webView;
+            this.js = js;
+        }
+
+        @Override
+        public void run() {
+            try {
+                webView.evaluateJavascript(js, null);
+            } catch (Throwable t) {
+                Log.w(TAG, "目录回填失败: " + t);
+            }
         }
     }
 

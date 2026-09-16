@@ -632,7 +632,8 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
           <label for="setDlDir">下载目录</label>
           <div class="input-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-            <input id="setDlDir" type="text" autocomplete="off" placeholder="C:\Users\你\Downloads">
+            <input id="setDlDir" type="text" autocomplete="off" placeholder="C:\Users\你\Downloads" readonly>
+            <button type="button" class="btn btn-ghost btn-sm" id="pickDirBtn" style="flex-shrink:0">选择</button>
           </div>
         </div>
         <div class="row-2" style="grid-template-columns:1fr 110px">
@@ -2471,6 +2472,7 @@ async function fillSettingsForm(){
     if(cfg?.downloadDir) dir = cfg.downloadDir;
   }catch(e){}
   $("#setDlDir").value = dir;
+  syncDlDirAlign();
 }
 
 /** 下载地址统一走本地下载代理：手动跟随跳转并携带 Cookie/Referer/UA（必须是完整 http 地址，Gopeed 不认相对路径） */
@@ -2547,6 +2549,15 @@ function dlUrl(url, pan, otherParam, headers, direct){
     if(np.password) u += "&proxyPass=" + encodeURIComponent(np.password);
   }
   return u;
+}
+
+/** 下载目录对齐：长路径滚动到底显示完整尾部（视觉靠右），短路径保持左对齐 */
+function syncDlDirAlign(){
+  const el = $("#setDlDir");
+  if(!el) return;
+  requestAnimationFrame(() => {
+    el.scrollLeft = (el.scrollWidth > el.clientWidth) ? el.scrollWidth : 0;
+  });
 }
 
 async function saveSettingsForm(){
@@ -2690,6 +2701,27 @@ function bindEvents(){
   $("#shareUrl").addEventListener("keydown", e => { if(e.key === "Enter") handleParse(); });
 
   $("#saveBtn").addEventListener("click", saveSettingsForm);
+  // 选择下载目录：调 Android 原生目录选择器，选完回填并立即保存生效
+  $("#pickDirBtn").addEventListener("click", () => {
+    if(!window.AndroidBridge || !AndroidBridge.chooseDir){
+      toast("当前环境不支持目录选择", "err");
+      return;
+    }
+    window.__dirPicked = (path) => {
+      window.__dirPicked = null;
+      if(!path){
+        toast("未选择目录", "err");
+        return;
+      }
+      $("#setDlDir").value = path;
+      syncDlDirAlign(); // 长路径滚动到底，确保尾部目录名可见
+      toast("已选择目录，正在保存…", "ok");
+      saveSettingsForm();
+    };
+    AndroidBridge.chooseDir();
+  });
+  // 手动输入路径时同步对齐（长路径滚到底、短路径左对齐）
+  $("#setDlDir").addEventListener("input", syncDlDirAlign);
   // 检测引擎：只检测内置引擎状态，不触发保存
   $("#testConnBtn").addEventListener("click", async () => {
     await refreshGopeedStatus(false);
