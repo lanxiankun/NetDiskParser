@@ -939,6 +939,28 @@ function parseApiKey(){
 }
 
 /** 分享文件夹：把当前分享链接生成目录分享页（/dir/xxx），需解析站 API Key */
+// 预取目录名：粘贴/输入链接后立即后台读取第一层目录名（不阻塞解析）
+let cachedDirName = "";
+let cachedUrlKey = "";
+function prefetchDirName(url){
+  cachedDirName = "";
+  cachedUrlKey = url;
+  const key = parseApiKey();
+  if(!key) return;
+  fetch(PARSER_BASE + "/v2/getFileList?url=" + encodeURIComponent(url) + "&token=" + encodeURIComponent(key))
+    .then(r => r.json().catch(() => null))
+    .then(j => {
+      if(cachedUrlKey !== url) return; // 输入已变化，丢弃旧结果
+      const list = (j && j.data) || [];
+      const fd = list.find(it => {
+        const t = (it.fileType || "").toLowerCase();
+        return t === "folder" || t === "dir";
+      });
+      cachedDirName = (fd && (fd.fileName || fd.name)) || "";
+    })
+    .catch(() => {});
+}
+
 async function createDirShare(){
   const key = parseApiKey();
   if(!key) return;
@@ -979,10 +1001,13 @@ async function createDirShare(){
         });
         if(fd && (fd.fileName || fd.name)) title = fd.fileName || fd.name;
       }
+      if(!title && cachedDirName && cachedUrlKey === url){
+        title = cachedDirName;
+      }
       if(title){
         if(tEl) tEl.textContent = title;
       }else{
-        // 未解析过：读 /v2/directoryShare/{code}（免额度）取第一层目录名
+        // 未解析且未预取到：读 /v2/directoryShare/{code}（免额度）取第一层目录名
         const code = String(d.url).split("/").filter(Boolean).pop();
         if(code){
           fetch(PARSER_BASE + "/v2/directoryShare/" + encodeURIComponent(code))
@@ -1367,6 +1392,7 @@ async function autoFillFromClipboard(silent){
     pwdEl.value = info.pwd || "";
     syncUrlWrap();
     syncParseBtn();
+    prefetchDirName(info.url);
     const hint = $("#clipHint");
     if(hint){
       hint.style.display = "block";
@@ -2197,6 +2223,7 @@ function renderHistory(){
       $("#sharePwd").value = h.pwd || "";
       syncUrlWrap();
       syncParseBtn();
+      prefetchDirName(h.url);
       navigate("parse");
       handleParse();
     });
@@ -2831,6 +2858,7 @@ function bindEvents(){
     if(!info || !info.url) return;
     // 联动提取码：识别到就覆盖填入，没识别到就清空（防止残留上一次的提取码）
     $("#sharePwd").value = info.pwd || "";
+    prefetchDirName(info.url);
     // 输入是整段文本（非纯 URL）时，回填为识别出的链接
     if(!/^https?:\/\//i.test(v)){
       $("#shareUrl").value = info.url;
