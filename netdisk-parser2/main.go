@@ -34,7 +34,7 @@ var uiFS embed.FS
 
 const (
 	ParserBase  = "https://189.qaiu.top"
-	DefaultPort = 18090
+	DefaultPort = 18091
 	AppName     = "NetDiskParser2"
 )
 

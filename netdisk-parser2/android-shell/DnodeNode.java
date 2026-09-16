@@ -744,7 +744,7 @@ public class DnodeNode {
     /** 状态上报到会话日志（经 Go 侧 /app/pylog） */
     static void logStatus(Context ctx, String msg) {
         try {
-            URL u = new URL("http://127.0.0.1:18090/app/pylog?msg=" + URLEncoder.encode(msg, "UTF-8"));
+            URL u = new URL("http://127.0.0.1:18091/app/pylog?msg=" + URLEncoder.encode(msg, "UTF-8"));
             HttpURLConnection c = (HttpURLConnection) u.openConnection();
             c.setConnectTimeout(2000);
             c.setReadTimeout(2000);

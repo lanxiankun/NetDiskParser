@@ -206,7 +206,7 @@ public class MainActivity extends Activity {
         NetLogRunnable(String msg){ this.msg = msg; }
         @Override public void run(){
             try{
-                URL u = new URL("http://127.0.0.1:18090/app/pylog?tag="
+                URL u = new URL("http://127.0.0.1:18091/app/pylog?tag="
                         + URLEncoder.encode("网络", "UTF-8")
                         + "&msg=" + URLEncoder.encode(msg, "UTF-8"));
                 HttpURLConnection c = (HttpURLConnection) u.openConnection();
@@ -457,7 +457,7 @@ public class MainActivity extends Activity {
 
         private boolean canConnect() {
             try {
-                java.net.Socket socket = new java.net.Socket("127.0.0.1", 18090);
+                java.net.Socket socket = new java.net.Socket("127.0.0.1", 18091);
                 socket.close();
                 return true;
             } catch (Exception e) {
@@ -475,8 +475,8 @@ public class MainActivity extends Activity {
 
         @Override
         public void run() {
-            Log.i(TAG, "加载 http://127.0.0.1:18090/");
-            activity.webView.loadUrl("http://127.0.0.1:18090/");
+            Log.i(TAG, "加载 http://127.0.0.1:18091/");
+            activity.webView.loadUrl("http://127.0.0.1:18091/");
         }
     }
 
