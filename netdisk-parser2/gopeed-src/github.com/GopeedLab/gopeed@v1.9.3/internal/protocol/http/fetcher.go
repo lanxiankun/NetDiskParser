@@ -1544,6 +1544,11 @@ func (f *Fetcher) onDownloadComplete() {
 			}
 		}
 	}
+	// 补丁v2：文件大小已知但未下载满 → 无条件判定失败（切网/断流时部分连接收到
+	// 异常响应被当成正常结束，仅靠 allChunksComplete 无法兜住假完成）
+	if f.meta.Res.Size > 0 && !downloadComplete {
+		finalErr = fmt.Errorf("download incomplete: got %d/%d bytes", totalDownloaded, f.meta.Res.Size)
+	}
 	f.connMu.Unlock()
 
 	// Close the file before signaling completion

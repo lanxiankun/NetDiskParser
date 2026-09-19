@@ -628,6 +628,10 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 		if proxyAddr != "" {
 			if isQaiuHost(cur) {
 				appLog("下载代理: 解析服务 %s 直连（不走节点）", curHost(cur))
+			} else if isUcCdnHost(cur) || is123CdnHost(cur) || isQuarkCdnHost(cur) {
+				// UC/123 CDN（pds.uc.cn、cjjd19.com 等）仅大陆网络可达，节点多为境外
+				// 无法回源（socks host unreachable）或线路极慢，必须手机直连
+				appLog("下载代理: 国内CDN %s 直连（不走节点）", curHost(cur))
 			} else {
 				hopProxyKey = proxyKey
 				if tr, ok := socks5TransportCache.Load(proxyKey); ok {
@@ -657,7 +661,7 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 			// 已走到 CDN 直链但请求失败（典型：节点到 123 CDN 部分 IP host unreachable）：
 			// 重试同一地址无意义（DNS 由节点侧解析，短时间同 IP），重置回解析服务重新走 302，
 			// 服务端会分配新的 CDN 主机（cjjd19.com 多机房轮询），大概率可绕开不可达 IP
-			if cur != target && !isQaiuHost(cur) {
+			if cur != target && !isQaiuHost(cur) && !isUcCdnHost(cur) && !is123CdnHost(cur) && !isQuarkCdnHost(cur) {
 				appLogError("下载代理: CDN %s 请求失败，重新走 302 换地址: %v", curHost(cur), err)
 				cur = target
 				continue
@@ -740,6 +744,24 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "重定向次数过多", http.StatusBadGateway)
 }
 
+// isUcCdnHost 判断目标是否 UC CDN 域名（pds.uc.cn 等）：必须直连（不走节点），
+func isUcCdnHost(raw string) bool {
+	host := curHost(raw)
+	return strings.Contains(host, "pds.uc.cn") || strings.Contains(host, ".uc.cn")
+}
+
+// isQuarkCdnHost 判断目标是否夸克 CDN 域名（drive.quark.cn / pds.quark.cn）：直连（不走节点），
+func isQuarkCdnHost(raw string) bool {
+	host := curHost(raw)
+	return strings.Contains(host, "drive.quark.cn") || strings.Contains(host, "pds.quark.cn")
+}
+
+// is123CdnHost 判断目标是否 123 网盘 CDN 域名（cjjd19.com 等）：直连（不走节点），
+func is123CdnHost(raw string) bool {
+	host := curHost(raw)
+	return strings.Contains(host, "cjjd19.com") || strings.Contains(host, "123295.com") || strings.Contains(host, "123pan")
+}
+
 // isQaiuHost 判断目标是否解析服务域名（189.qaiu.top）：必须直连，
 // 代理节点（dnode SOCKS5）无法回源该服务，否则拿不到 CDN 直链
 func isQaiuHost(raw string) bool {
@@ -807,11 +829,31 @@ func socks5Transport(proxyAddr, proxyUser, proxyPass string) (*http.Transport, e
 	}
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer.Dial(network, addr)
+			// 节点连接加 15s 超时：节点对部分国内 CDN 不可达时 TCP 会挂起，必须快速失败重试。
+			// x/net/proxy.Dialer.Dial 不支持 context，用 goroutine+select 实现超时
+			type dialResult struct {
+				conn net.Conn
+				err  error
+			}
+			ch := make(chan dialResult, 1)
+			go func() {
+				c, err := dialer.Dial(network, addr)
+				ch <- dialResult{c, err}
+			}()
+			select {
+			case r := <-ch:
+				return r.conn, r.err
+			case <-time.After(15 * time.Second):
+				return nil, fmt.Errorf("socks5 dial timeout: %s", addr)
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		},
-		MaxIdleConns:        128,
-		MaxIdleConnsPerHost: 64,
-		IdleConnTimeout:     90 * time.Second,
+		MaxIdleConns:           128,
+		MaxIdleConnsPerHost:    64,
+		IdleConnTimeout:        90 * time.Second,
+		TLSHandshakeTimeout:    15 * time.Second,
+		ResponseHeaderTimeout:  30 * time.Second,
 	}
 	socks5TransportCache.Store(key, tr)
 	return tr, nil

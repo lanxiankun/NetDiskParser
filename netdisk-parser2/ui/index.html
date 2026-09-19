@@ -1499,7 +1499,7 @@ async function downloadToGopeed(r){
   const pan = resolvePan(r.panType, "", r.directLink || r.parserUrl || "");
   const headers = antiHotlinkHeader(pan, r.otherParam);
   try{
-    const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam, headers, pan === "uc" ? false : undefined), r.fileInfo?.fileName, headers, pan);
+    const id = await gopeedCreateTask(dlUrl(url, pan, r.otherParam, headers, pan === "uc" ? false : undefined, pan === "uc" || pan === "ye" || pan === "qk" ? false : undefined), r.fileInfo?.fileName, headers, pan, extractDownInfo(r.parserUrl || r.directLink || ""));
     logOp("发送下载: " + (r.fileInfo?.fileName || "") + " (#" + id.slice(0, 8) + ")");
     toast("已发送到 Gopeed，任务 #" + id.slice(0, 8), "ok");
   }catch(err){
@@ -1530,7 +1530,7 @@ function normalizeHeaders(h){
   return out;
 }
 
-async function gopeedCreateTask(url, name, headers, pan){
+async function gopeedCreateTask(url, name, headers, pan, taskInfo){
   const th = settings.threads || 4;
   // UC/夸克 OSS 直链带回调验证（checkplay），高并发分片会触发回调风暴被拒/挂起，单独限流
   let conn = th;
@@ -1551,7 +1551,9 @@ async function gopeedCreateTask(url, name, headers, pan){
       extra: { connections: conn },
     },
   };
-  return await gopeedFetch("/api/v1/tasks", { method: "POST", body });
+  const id = await gopeedFetch("/api/v1/tasks", { method: "POST", body });
+  if(id && taskInfo) dlTaskInfo[id] = Object.assign({ name }, taskInfo, { lastResume: 0 });
+  return id;
 }
 
 /* ===== 目录树 ===== */
@@ -1976,7 +1978,7 @@ async function batchDownloadSelected(){
       try{
         const pan = resolvePan(it.panType, currentTree.panType, it.parserUrl || "");
         const t = await buildDownloadTarget(it.parserUrl, pan, currentTree.otherParam);
-        await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), it.fileName, t.headers, pan);
+        await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc", pan === "uc" || pan === "ye" || pan === "qk" ? false : undefined), it.fileName, t.headers, pan, t.di || extractDownInfo(it.parserUrl || ""));
         ok++;
       }catch(e){ fail++; }
     }
@@ -2000,7 +2002,7 @@ async function downloadFileItem(item){
   logOp("下载文件: " + (item.fileName || "").slice(0, 60));
   try{
     const t = await buildDownloadTarget(item.parserUrl, pan, currentTree.otherParam);
-    await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc"), item.fileName, t.headers, pan);
+    await gopeedCreateTask(dlUrl(t.url, pan, currentTree.otherParam, t.headers, t.direct && pan !== "uc", pan === "uc" || pan === "ye" || pan === "qk" ? false : undefined), item.fileName, t.headers, pan, t.di || extractDownInfo(item.parserUrl || ""));
     // 下载成功后取消该文件选中，避免重复下载
     currentTree.selected.delete(item.fileId || item.parserUrl);
     if(currentTree.navContentEl && currentTree.navItems) renderTreeItems(currentTree.navItems, currentTree.navContentEl);
@@ -2088,6 +2090,35 @@ function renderStatusCard(){
 }
 
 let lastTaskSnap = {}; // 下载任务状态快照（id -> {status, done, stallSince}），用于状态变化/卡住日志
+/** 自动续传：CDN 直链失效/403 时刷新直链并继续（60 秒限频，最多持续重试） */
+const dlTaskInfo = {}; // id -> {pan, param, sign, name, lastResume}
+async function autoResumeTask(id){
+  const info = dlTaskInfo[id];
+  if(!info){
+    logOp("自动续传: #" + String(id).slice(0, 8) + " 无任务信息，跳过");
+    return;
+  }
+  if(!info.param) return;
+  const now = Date.now();
+  if(now - (info.lastResume || 0) < 30000) return; // 30 秒限频，避免反复刷新直链
+  info.lastResume = now;
+  try{
+    const fresh = await apiGetFileDownInfo(info.pan, info.param, info.sign);
+    if(!fresh || !fresh.downloadUrl) return;
+    // 节点对部分 CDN IP 间歇 host unreachable：交替使用 节点中转 ↔ Go 直连，总有一条通道可达
+    info.retry = (info.retry || 0) + 1;
+    const useProxy = (info.retry % 2 === 1);
+    const u = dlUrl(fresh.downloadUrl, info.pan, null, Object.assign({}, antiHotlinkHeader(info.pan, null), fresh.downloadHeaders || {}), true, useProxy);
+    await gopeedFetch("/api/v1/tasks/" + id, { method: "PATCH", body: { req: { url: u } } });
+    // 任务若已暂停/出错则恢复；running 状态 continue 会报 ErrTaskNotFound（filter 排除 running），忽略——PATCH 已生效，分片自动用新直链
+    try{
+      await gopeedFetch("/api/v1/tasks/" + id + "/continue", { method: "PUT" });
+    }catch(e){}
+    logOp(`任务[${(info.name || id).slice(0, 40)}] 自动续传: 直链已刷新并继续（${useProxy ? "经节点" : "直连"}）`);
+  }catch(e){
+    logOp(`自动续传失败: ${e && e.message ? String(e.message).slice(0, 120) : e}`);
+  }
+}
 async function refreshTasks(){
   if(!gopeedOnline) return;
   try{
@@ -2111,11 +2142,13 @@ async function refreshTasks(){
       const name = (t.name || id).slice(0, 40);
       if(!prev || prev.status !== st){
         logOp(`下载任务[${name}] 状态: ${prev ? (prev.status + " → " + st) : ("新建 → " + st)} 已下载=${fmtSize(done)} 速度=${fmtSize(speed)}/s`);
+        if(st === "error") autoResumeTask(id); // 出错自动续传（刷新直链）
       }else if(st === "running" && prev.done === done){
         // 疑似卡住：状态 running 但字节数与上轮相同（速度 0）
         if(!prev.stallSince) prev.stallSince = Date.now();
         else if(Date.now() - prev.stallSince >= 10000){
           logOp(`下载任务[${name}] 疑似卡住: 10秒无进度 已下载=${fmtSize(done)} 速度=0 B/s`);
+          autoResumeTask(id); // 卡住可能因 CDN 403 静默失败，刷新直链续传
           prev.stallSince = Date.now(); // 重置避免每轮重复记录
         }
       }else if(prev.stallSince){
@@ -2542,21 +2575,21 @@ function extractDownInfo(url){
 /** 构建下载目标：优先 getFileDownInfo（链接自带 apiKeySign 免 API Key）拿权威直链 direct 直连
  *  （123 等 CDN 直链直接可下，无需 302 中转，避免节点到 CDN 部分 IP 不可达），失败回退 parserUrl 走 /dl/ 代理 */
 async function buildDownloadTarget(parserUrl, pan, otherParam){
-  const base = { url: parserUrl, headers: antiHotlinkHeader(pan, otherParam), direct: false };
+  const di = extractDownInfo(parserUrl);
+  const base = { url: parserUrl, headers: antiHotlinkHeader(pan, otherParam), direct: false, di };
   try{
-    const di = extractDownInfo(parserUrl);
     if(di && di.sign){
       const info = await apiGetFileDownInfo(di.pan || pan, di.param, di.sign);
       if(info && info.downloadUrl){
         const hdrs = Object.assign({}, base.headers, info.downloadHeaders || {});
-        return { url: info.downloadUrl, headers: hdrs, direct: true };
+        return { url: info.downloadUrl, headers: hdrs, direct: true, di };
       }
     }
   }catch(e){}
   return base;
 }
 
-function dlUrl(url, pan, otherParam, headers, direct){
+function dlUrl(url, pan, otherParam, headers, direct, useProxy){
   // 统一走本地代理（/dl/）：Gopeed 只连 127.0.0.1 稳定通道，切换网络不影响任务状态，
   // 防盗链头、节点中转、302 重试与断点续传由代理层处理，避免直连外网时断网误判完成
   let u = location.origin + "/dl/?url=" + encodeURIComponent(url);
@@ -2566,9 +2599,10 @@ function dlUrl(url, pan, otherParam, headers, direct){
   if(headers && Object.keys(headers).length){
     u += "&hdr=" + encodeURIComponent(JSON.stringify(normalizeHeaders(headers)));
   }
-  // 节点代理：123 等网盘 CDN 直链需经节点 SOCKS5 中转下载（设置页配置，可留空直连）
+  // 节点代理：123 等网盘 CDN 直链需经节点 SOCKS5 中转下载（设置页配置，可留空直连）；
+  // useProxy=false 时强制走 Go 代理直连（不经节点），用于节点对 CDN 间歇不可达时的备用通道
   const np = settings.nodeProxy;
-  if(np && np.host){
+  if(np && np.host && useProxy !== false){
     u += "&proxy=" + encodeURIComponent(np.host + ":" + (np.port || 1080));
     if(np.username) u += "&proxyUser=" + encodeURIComponent(np.username);
     if(np.password) u += "&proxyPass=" + encodeURIComponent(np.password);

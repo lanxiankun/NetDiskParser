@@ -19,7 +19,6 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,10 +39,8 @@ const (
 )
 
 type appConfig struct {
-	DownloadDir string           `json:"downloadDir"`
-	QuarkCookie string           `json:"quarkCookie,omitempty"`
-	ApiKey      string           `json:"apiKey,omitempty"`
-	History     []map[string]any `json:"history,omitempty"`
+	DownloadDir string `json:"downloadDir"`
+	QuarkCookie string `json:"quarkCookie,omitempty"`
 }
 
 var gopeedPort int
@@ -51,7 +48,6 @@ var serverAddr string
 var appConfigPath string
 var appLogPath string
 var quarkCookie string // 夸克 Cookie（设置页保存，下载代理自动携带）
-var apiKey string      // 解析 API Key（设置页保存，持久化到 app.json，退出后不丢）
 
 var logMu sync.Mutex
 
@@ -338,24 +334,15 @@ func runServer(dataDir string) error {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
 
-	// 随机端口绑定：避免与同机其他 App（如旧版云盘解析下载器）冲突
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return fmt.Errorf("监听本地端口失败: %w", err)
-	}
-	port = ln.Addr().(*net.TCPAddr).Port
-	serverAddr = fmt.Sprintf("127.0.0.1:%d", port)
-	// 端口写入 filesDir/server.port，供安卓壳读取后加载页面/上报日志
-	if err := os.WriteFile(filepath.Join(appDir, "server.port"), []byte(strconv.Itoa(port)), 0o644); err != nil {
-		appLogError("写入端口文件失败: %v", err)
-	}
-	srv := &http.Server{Addr: serverAddr, Handler: mux}
+	addr := fmt.Sprintf("127.0.0.1:%d", DefaultPort)
+	serverAddr = addr
+	srv := &http.Server{Addr: addr, Handler: mux}
 	go func() {
-		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			appLogError("主服务启动失败: %v", err)
 		}
 	}()
-	appLog("界面地址 http://%s", serverAddr)
+	appLog("界面地址 http://%s", addr)
 	return nil
 }
 
@@ -474,11 +461,9 @@ const defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 // buildDownloadHeaders 根据目标地址里的网盘标识生成防盗链请求头
 func buildDownloadHeaders(target, uaOverride string) map[string]string {
 	h := map[string]string{}
+	m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target)
 	pan := ""
-	// 目录分享直链：/v2/directoryShare/redirectUrl/{shareCode}/{diskType}/{fileId}
-	if m := regexp.MustCompile(`/directoryShare/redirectUrl/([a-z0-9]+)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 2 {
-		pan = m[2]
-	} else if m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 1 {
+	if len(m) > 1 {
 		pan = m[1]
 	}
 	// 123 网盘直链域名识别（downloadUrl 为 cjjd19.com 等，不走 /parser 标识）
@@ -562,9 +547,7 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	panTag := "未知"
-	if m := regexp.MustCompile(`/directoryShare/redirectUrl/([a-z0-9]+)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 2 {
-		panTag = m[2]
-	} else if m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 1 {
+	if m := regexp.MustCompile(`/(?:redirectUrl|parser|directLink|getFileList)/([a-z0-9]+)`).FindStringSubmatch(target); len(m) > 1 {
 		panTag = m[1]
 	} else if strings.Contains(target, "pds.quark.cn") {
 		panTag = "qk"
@@ -721,14 +704,7 @@ func downloadProxy(w http.ResponseWriter, r *http.Request) {
 		// 会导致 Gopeed 判定不可分段而退化为单连接下载（速度受限）。源站实际支持 206，强制声明可让分片并发生效。
 		w.Header().Set("Accept-Ranges", "bytes")
 		w.WriteHeader(resp.StatusCode)
-		startCopy := time.Now()
-		n, _ := io.Copy(w, resp.Body)
-		elapsed := time.Since(startCopy)
-		rate := float64(0)
-		if elapsed > 0 {
-			rate = float64(n) / elapsed.Seconds() / 1024 / 1024
-		}
-		appLog("下载代理: 回传完成 %d 字节 / %s / %.1f MB/s", n, elapsed.Round(time.Millisecond), rate)
+		_, _ = io.Copy(w, resp.Body)
 		return
 	}
 	http.Error(w, "重定向次数过多", http.StatusBadGateway)
@@ -865,46 +841,19 @@ func appConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, cfg)
 	case http.MethodPost:
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		var cfg appConfig
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
-		// 合并保存：只更新本次提交的字段，避免不同入口互相覆盖
-		old := appConfig{}
-		if b, err := os.ReadFile(cfgPath); err == nil {
-			_ = json.Unmarshal(b, &old)
+		if cfg.DownloadDir == "" {
+			cfg.DownloadDir = defaultDownloadDir("")
 		}
-		if v, ok := body["downloadDir"].(string); ok && v != "" {
-			old.DownloadDir = v
-		}
-		if v, ok := body["quarkCookie"].(string); ok {
-			old.QuarkCookie = v
-		}
-		if v, ok := body["apiKey"].(string); ok {
-			old.ApiKey = v
-		}
-		if v, ok := body["history"].([]any); ok {
-			hist := []map[string]any{}
-			for _, it := range v {
-				if m, ok := it.(map[string]any); ok {
-					hist = append(hist, m)
-				}
-			}
-			if len(hist) > 20 {
-				hist = hist[:20]
-			}
-			old.History = hist
-		}
-		if old.DownloadDir == "" {
-			old.DownloadDir = defaultDownloadDir("")
-		}
-		quarkCookie = old.QuarkCookie
-		apiKey = old.ApiKey
+		quarkCookie = cfg.QuarkCookie
 		_ = os.MkdirAll(filepath.Dir(cfgPath), 0o755)
-		b, _ := json.Marshal(old)
+		b, _ := json.Marshal(cfg)
 		_ = os.WriteFile(cfgPath, b, 0o644)
-		writeJSON(w, map[string]string{"status": "ok", "downloadDir": old.DownloadDir})
+		writeJSON(w, map[string]string{"status": "ok", "downloadDir": cfg.DownloadDir})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
