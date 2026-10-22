@@ -356,7 +356,9 @@ public class MainActivity extends Activity {
                 if (!f.exists()) {
                     return "err:\u6587\u4ef6\u4e0d\u5b58\u5728";
                 }
-                Uri uri = Uri.parse("content://com.netdisk.parser.fileprovider/?path=" + Uri.encode(path));
+                // 用 id 映射真实路径，URI 里不暴露路径，防止外部应用绕过 ContentResolver 直接按路径访问
+                String fid = LocalFileProvider.registerFile(path);
+                Uri uri = Uri.parse("content://com.netdisk.parser.fileprovider/f/" + fid);
                 Intent intent;
                 if (path.toLowerCase().endsWith(".apk")) {
                     // APK 走系统安装器专属入口（ACTION_INSTALL_PACKAGE），避免被文件管理器等应用拦截弹"打开方式"
@@ -368,8 +370,12 @@ public class MainActivity extends Activity {
                     intent.setDataAndType(uri, guessMime(path));
                 }
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                // 精确 MIME 找不到应用时，回退到 */*
                 if (intent.resolveActivity(activity.getPackageManager()) == null) {
-                    return "err:\u6ca1\u6709\u53ef\u6253\u5f00\u8be5\u6587\u4ef6\u7684\u5e94\u7528";
+                    intent.setDataAndType(uri, "*/*");
+                    if (intent.resolveActivity(activity.getPackageManager()) == null) {
+                        return "err:\u6ca1\u6709\u53ef\u6253\u5f00\u8be5\u6587\u4ef6\u7684\u5e94\u7528";
+                    }
                 }
                 activity.runOnUiThread(new OpenFileRun(activity, intent));
                 return "ok";
@@ -415,15 +421,73 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 按扩展名猜 MIME 类型 */
+    /** 按扩展名猜 MIME 类型（硬映射常见类型，避免 octet-stream 兜底导致无关应用出现在打开方式里） */
     private static String guessMime(String path) {
         String ext = MimeTypeMap.getFileExtensionFromUrl(path);
-        if (ext != null) {
-            String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.toLowerCase());
-            if (mime != null) {
-                return mime;
-            }
+        if (ext == null || ext.length() == 0) {
+            // 尝试从文件名最后一个点取扩展名
+            int dot = path == null ? -1 : path.lastIndexOf('.');
+            if (dot >= 0 && dot + 1 < path.length()) ext = path.substring(dot + 1);
         }
+        if (ext != null) {
+            String e = ext.toLowerCase();
+            // 视频
+            if (e.equals("mp4")||e.equals("m4v")) return "video/mp4";
+            if (e.equals("mkv")) return "video/x-matroska";
+            if (e.equals("avi")) return "video/x-msvideo";
+            if (e.equals("mov")) return "video/quicktime";
+            if (e.equals("flv")) return "video/x-flv";
+            if (e.equals("wmv")) return "video/x-ms-wmv";
+            if (e.equals("webm")) return "video/webm";
+            if (e.equals("rmvb")||e.equals("rm")) return "video/x-pn-realvideo";
+            if (e.equals("ts")) return "video/mp2t";
+            // 图片
+            if (e.equals("jpg")||e.equals("jpeg")) return "image/jpeg";
+            if (e.equals("png")) return "image/png";
+            if (e.equals("gif")) return "image/gif";
+            if (e.equals("webp")) return "image/webp";
+            if (e.equals("bmp")) return "image/bmp";
+            if (e.equals("heic")||e.equals("heif")) return "image/heic";
+            if (e.equals("tiff")||e.equals("tif")) return "image/tiff";
+            if (e.equals("svg")) return "image/svg+xml";
+            if (e.equals("ico")) return "image/x-icon";
+            // 音频
+            if (e.equals("mp3")) return "audio/mpeg";
+            if (e.equals("flac")) return "audio/flac";
+            if (e.equals("wav")) return "audio/wav";
+            if (e.equals("m4a")||e.equals("aac")) return "audio/mp4";
+            if (e.equals("ogg")) return "audio/ogg";
+            if (e.equals("amr")) return "audio/amr";
+            if (e.equals("opus")) return "audio/opus";
+            // 文档
+            if (e.equals("pdf")) return "application/pdf";
+            if (e.equals("doc")) return "application/msword";
+            if (e.equals("docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            if (e.equals("xls")) return "application/vnd.ms-excel";
+            if (e.equals("xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            if (e.equals("ppt")) return "application/vnd.ms-powerpoint";
+            if (e.equals("pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            if (e.equals("txt")||e.equals("md")||e.equals("log")) return "text/plain";
+            if (e.equals("csv")) return "text/csv";
+            if (e.equals("rtf")) return "application/rtf";
+            if (e.equals("epub")) return "application/epub+zip";
+            if (e.equals("html")||e.equals("htm")) return "text/html";
+            if (e.equals("json")) return "application/json";
+            // 压缩包
+            if (e.equals("zip")) return "application/zip";
+            if (e.equals("rar")) return "application/vnd.rar";
+            if (e.equals("7z")) return "application/x-7z-compressed";
+            if (e.equals("tar")) return "application/x-tar";
+            if (e.equals("gz")) return "application/gzip";
+            if (e.equals("bz2")) return "application/x-bzip2";
+            if (e.equals("xz")) return "application/x-xz";
+            // APK / 安装包
+            if (e.equals("apk")) return "application/vnd.android.package-archive";
+            // 回退系统 MimeTypeMap
+            String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(e);
+            if (mime != null) return mime;
+        }
+        // 不认识的扩展名：octet-stream 兜底，系统会列出所有能处理任意文件的应用
         return "application/octet-stream";
     }
 
