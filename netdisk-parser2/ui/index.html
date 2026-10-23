@@ -69,6 +69,7 @@ a{color:var(--sky);text-decoration:none}
 /* ===== 主视图 ===== */
 main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
 .view{padding-top:calc(env(safe-area-inset-top, 0px) + 18px);display:none}
+.view[data-route="downloads"]{padding-top:calc(env(safe-area-inset-top, 0px) + 76px)}
 .view.active{display:block;animation:fadeIn .22s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
@@ -297,6 +298,12 @@ main{padding:0 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;mar
 .task-acts{display:flex;gap:7px;margin-top:9px;justify-content:flex-end}
 .task-acts .btn{padding:6px 12px;font-size:11.5px;border-radius:8px}
 
+/* ===== 顶部下载分类 tab（fixed 在视口顶部，跟底部导航同级） ===== */
+.task-filter-bar{display:none;justify-content:center;position:fixed;top:0;left:0;right:0;z-index:60;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:calc(6px + env(safe-area-inset-top,0px)) 16px 6px}body.downloads-page .task-filter-bar{display:flex}
+.task-filter-seg{display:inline-flex;background:var(--surface-2,#e8eaed);border-radius:20px;padding:3px;position:relative}
+.task-filter-btn{padding:6px 26px;border:none;background:transparent;color:var(--text-dim);border-radius:17px;font-size:13px;font-weight:600;cursor:pointer;position:relative;z-index:1;transition:color .2s}
+.task-filter-btn.active{background:var(--accent);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+
 /* ===== 底部导航 ===== */
 .tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:60;
@@ -512,11 +519,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .op-btn:hover{color:var(--text);border-color:var(--text-3)}
 .op-btn.danger:hover{color:var(--err);border-color:var(--err)}
 .op-btn svg{width:14px;height:14px;stroke:currentColor}
-.batch-bar{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom));z-index:30;
+.batch-bar{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom));left:16px;right:16px;z-index:55;
   display:flex;align-items:center;gap:10px;
   background:var(--surface-2);border:1px solid var(--border);
-  border-radius:12px;padding:9px 12px;margin-bottom:14px;
+  border-radius:12px;padding:9px 12px;
   box-shadow:0 8px 30px rgba(0,0,0,.4);}
+#tasksArea{padding-bottom:72px;}
 .batch-bar .bb-info{flex:1;font-size:12.5px;color:var(--text-2)}
 .batch-bar .bb-info strong{color:var(--text)}
 .toggle-row .t-sub{font-size:11px;color:var(--text-3);margin-top:2px}
@@ -680,6 +688,14 @@ body::-webkit-scrollbar, .view::-webkit-scrollbar, *::-webkit-scrollbar{display:
     <div class="set-author">作者：南在南方</div>
   </section>
 </main>
+
+<!-- ===== 顶部下载分类 tab（fixed 在视口顶部，跟底部导航同级） ===== -->
+<div id="taskFilterBar" class="task-filter-bar">
+  <div class="task-filter-seg">
+    <button class="task-filter-btn active" data-f="active">下载中</button>
+    <button class="task-filter-btn" data-f="done">已完成</button>
+  </div>
+</div>
 
 <!-- ===== 底部导航 ===== -->
 <nav class="tabbar">
@@ -2188,8 +2204,18 @@ function statusMeta(status){
   return map[status] || ["wait", status || "未知"];
 }
 
+let taskFilter = "active"; // active=下载中(含暂停/出错/排队), done=已完成
+let currentFilteredTasks = []; // 当前tab过滤后的任务列表（全选用）
 function renderTasks(){
   const area = $("#tasksArea");
+  // 排序+过滤先算（任何分支都要用），并立即刷新批量栏
+  const sorted = [...tasks].sort((a,b) => {
+    const ta = new Date(a.createdAt).getTime() || 0;
+    const tb = new Date(b.createdAt).getTime() || 0;
+    return tb - ta;
+  });
+  currentFilteredTasks = sorted.filter(t => taskFilter === "done" ? t.status === "done" : t.status !== "done");
+  renderBatchBar();
   if(gopeedOnline === false){
     area.innerHTML = `<div class="card"><div class="empty">
       ${ICONS.wifi}
@@ -2214,15 +2240,21 @@ function renderTasks(){
     if(btn) btn.addEventListener("click", () => navigate("parse"));
     return;
   }
+  if(!currentFilteredTasks.length){
+    area.innerHTML = `<div class="card"><div class="empty">
+      ${ICONS.box}
+      <p>${taskFilter === "done" ? "暂无已完成的下载" : "暂无下载中的任务"}</p>
+    </div></div>`;
+    return;
+  }
   // 增量更新：已存在卡片只更新字段，新增才建卡片，消失才移除（canvas 保留，波形不闪）
   // 先清除占位（空提示/引擎异常/检测中），避免与任务卡片并存
   const ph = area.querySelector(":scope > .card:not(.task-card)");
   if(ph) ph.remove();
-  const sorted = [...tasks].sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
   const existing = new Map();
   area.querySelectorAll(".task-card").forEach(c => existing.set(c.dataset.id, c));
   const seen = new Set();
-  sorted.forEach(t => {
+  currentFilteredTasks.forEach(t => {
     seen.add(t.id);
     const card = existing.get(t.id);
     if(card) updateTaskCard(card, t);
@@ -2234,6 +2266,10 @@ function renderTasks(){
 /** 增量更新已有任务卡片：状态变化才动徽章/按钮，进度/速度每次实时更新 */
 function updateTaskCard(card, t){
   const id = t.id;
+  const sel = selectedTasks.has(id);
+  card.classList.toggle("selected", sel);
+  const chk = card.querySelector(".task-check");
+  if(chk) chk.classList.toggle("on", sel);
   const [cls, label] = statusMeta(t.status);
   const total = t.meta?.res?.size || 0;
   const done = t.progress?.downloaded || 0;
@@ -2470,21 +2506,32 @@ function drawWaves(){
 let selectedTasks = new Set();
 function renderBatchBar(){
   const bar = $("#batchBar");
-  const n = selectedTasks.size;
-  if(!n){
+  const visible = currentFilteredTasks.length;
+  if(!visible){
     bar.innerHTML = "";
     return;
   }
+  const n = selectedTasks.size;
+  const allSelected = visible > 0 && n === visible;
   bar.innerHTML = `
     <div class="batch-bar">
-      <div class="bb-info">已选 <strong>${n}</strong> 个任务</div>
-      <button class="btn btn-ghost btn-sm" id="batchPause">暂停</button>
-      <button class="btn btn-ghost btn-sm" id="batchResume">继续</button>
-      <button class="btn btn-danger btn-sm" id="batchDelete">删除</button>
+      <div class="bb-info">${n ? "已选 <strong>"+n+"</strong> 个任务" : "共 "+visible+" 个任务"}</div>
+      <button class="btn btn-ghost btn-sm" id="batchSelectAll" ${allSelected ? "disabled" : ""}>全选</button>
+      <button class="btn btn-ghost btn-sm" id="batchUnselect" ${n ? "" : "disabled"}>取消</button>
+      <button class="btn btn-danger btn-sm" id="batchDelete" ${n ? "" : "disabled"}>删除</button>
     </div>`;
-  $("#batchPause").addEventListener("click", () => batchOp("pause"));
-  $("#batchResume").addEventListener("click", () => batchOp("resume"));
-  $("#batchDelete").addEventListener("click", () => batchOp("delete"));
+  $("#batchSelectAll").addEventListener("click", () => {
+    currentFilteredTasks.forEach(t => selectedTasks.add(t.id));
+    renderTasks();
+  });
+  $("#batchUnselect").addEventListener("click", () => {
+    selectedTasks.clear();
+    renderTasks();
+  });
+  $("#batchDelete").addEventListener("click", () => {
+    if(!selectedTasks.size) return;
+    batchOp("delete");
+  });
 }
 function batchOp(op){
   [...selectedTasks].forEach(id => taskOp(id, op));
@@ -2658,6 +2705,7 @@ function applyRoute(){
   const valid = ["parse","history","downloads","mine"].includes(route) ? route : "parse";
   $$(".view").forEach(v => v.classList.toggle("active", v.dataset.route === valid));
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === valid));
+  document.body.classList.toggle("downloads-page", valid === "downloads");
   if(valid === "downloads"){
     refreshGopeedStatus(true);
     refreshTasks();
@@ -2719,6 +2767,12 @@ function syncUrlWrap(){
 /* ================= 事件绑定 ================= */
 function bindEvents(){
   $$(".tab").forEach(t => t.addEventListener("click", () => navigate(t.dataset.tab)));
+  $$("#taskFilterBar .task-filter-btn").forEach(btn => btn.addEventListener("click", () => {
+    taskFilter = btn.dataset.f;
+    selectedTasks.clear(); // 切换tab自动取消选中
+    $$("#taskFilterBar .task-filter-btn").forEach(b => b.classList.toggle("active", b === btn));
+    renderTasks();
+  }));
   $("#parseBtn").addEventListener("click", handleParse);
   const clearBtnEl = $("#clearBtn");
   if(clearBtnEl) clearBtnEl.addEventListener("click", () => {
@@ -2800,6 +2854,46 @@ function bindEvents(){
   });
 
   window.addEventListener("hashchange", applyRoute);
+
+  // 左右滑手势切换：下载页切换下载中/已完成（连续滑动），其他页面切换底部导航
+  let _swipeStartX = 0, _swipeStartY = 0, _swipeTarget = null;
+  document.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+    _swipeStartX = t.clientX; _swipeStartY = t.clientY; _swipeTarget = e.target;
+  }, {passive: true});
+  document.addEventListener("touchend", e => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - _swipeStartX;
+    const dy = t.clientY - _swipeStartY;
+    if(Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if(_swipeTarget && _swipeTarget.closest("input,textarea,button,.tabbar,#taskFilterBar,.nav-breadcrumb,.modal-mask")) return;
+    const route = (location.hash.replace(/^#\/?/, "") || "parse");
+    if(route === "downloads"){
+      // 连续滑动：历史 ↔ 下载中 ↔ 已完成 ↔ 我的
+      if(taskFilter === "active"){
+        if(dx < 0){ // 下载中左滑→已完成
+          taskFilter = "done"; selectedTasks.clear();
+          $$("#taskFilterBar .task-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.f === "done"));
+          renderTasks();
+        }else{ // 下载中右滑→上一页（历史）
+          navigate("history");
+        }
+      }else{ // taskFilter === "done"
+        if(dx < 0){ // 已完成左滑→下一页（我的）
+          navigate("mine");
+        }else{ // 已完成右滑→下载中
+          taskFilter = "active"; selectedTasks.clear();
+          $$("#taskFilterBar .task-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.f === "active"));
+          renderTasks();
+        }
+      }
+    }else{
+      const routes = ["parse","history","downloads","mine"];
+      let idx = routes.indexOf(route); if(idx < 0) idx = 0;
+      idx = dx < 0 ? Math.min(idx + 1, routes.length - 1) : Math.max(idx - 1, 0);
+      navigate(routes[idx]);
+    }
+  }, {passive: true});
 }
 
 /* ================= 运行日志 ================= */

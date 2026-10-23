@@ -537,11 +537,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .op-btn:hover{color:var(--text);border-color:var(--text-3)}
 .op-btn.danger:hover{color:var(--err);border-color:var(--err)}
 .op-btn svg{width:14px;height:14px;stroke:currentColor}
-.batch-bar{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom));z-index:30;
+.batch-bar{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom));left:16px;right:16px;z-index:55;
   display:flex;align-items:center;gap:10px;
   background:var(--surface-2);border:1px solid var(--border);
-  border-radius:12px;padding:9px 12px;margin-bottom:14px;
+  border-radius:12px;padding:9px 12px;
   box-shadow:0 8px 30px rgba(0,0,0,.4);}
+#tasksArea{padding-bottom:72px;}
 .batch-bar .bb-info{flex:1;font-size:12.5px;color:var(--text-2)}
 .batch-bar .bb-info strong{color:var(--text)}
 .toggle-row .t-sub{font-size:11px;color:var(--text-3);margin-top:2px}
@@ -2396,7 +2397,7 @@ function renderTasks(){
   const existing = new Map();
   area.querySelectorAll(".task-card").forEach(c => existing.set(c.dataset.id, c));
   const seen = new Set();
-  filtered.forEach(t => {
+  currentFilteredTasks.forEach(t => {
     seen.add(t.id);
     const card = existing.get(t.id);
     if(card) updateTaskCard(card, t);
@@ -2994,6 +2995,46 @@ function bindEvents(){
   });
 
   window.addEventListener("hashchange", applyRoute);
+
+  // 左右滑手势切换：下载页切换下载中/已完成，其他页面切换底部导航
+  let _swipeStartX = 0, _swipeStartY = 0, _swipeTarget = null;
+  document.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+    _swipeStartX = t.clientX; _swipeStartY = t.clientY; _swipeTarget = e.target;
+  }, {passive: true});
+  document.addEventListener("touchend", e => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - _swipeStartX;
+    const dy = t.clientY - _swipeStartY;
+    if(Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return; // 水平滑动阈值
+    if(_swipeTarget && _swipeTarget.closest("input,textarea,button,.tabbar,#taskFilterBar,.nav-breadcrumb,.modal-mask")) return;
+    const route = (location.hash.replace(/^#\/?/, "") || "parse");
+    if(route === "downloads"){
+      // 连续滑动：历史 ↔ 下载中 ↔ 已完成 ↔ 我的
+      if(taskFilter === "active"){
+        if(dx < 0){ // 下载中左滑→已完成
+          taskFilter = "done"; selectedTasks.clear();
+          $$("#taskFilterBar .task-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.f === "done"));
+          renderTasks();
+        }else{ // 下载中右滑→上一页（历史）
+          navigate("history");
+        }
+      }else{ // taskFilter === "done"
+        if(dx < 0){ // 已完成左滑→下一页（我的）
+          navigate("mine");
+        }else{ // 已完成右滑→下载中
+          taskFilter = "active"; selectedTasks.clear();
+          $$("#taskFilterBar .task-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.f === "active"));
+          renderTasks();
+        }
+      }
+    }else{
+      const routes = ["parse","history","downloads","mine"];
+      let idx = routes.indexOf(route); if(idx < 0) idx = 0;
+      idx = dx < 0 ? Math.min(idx + 1, routes.length - 1) : Math.max(idx - 1, 0); // 左滑→下一页，右滑→上一页
+      navigate(routes[idx]);
+    }
+  }, {passive: true});
 }
 
 /* ================= 运行日志 ================= */
